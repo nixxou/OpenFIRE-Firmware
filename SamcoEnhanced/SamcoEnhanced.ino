@@ -24,6 +24,24 @@
 #include <RP2040.h>
 #include <OpenFIREBoard.h>
 
+#ifdef USES_NUNCHUCK
+    #include <Wire.h>
+    #define NUNCHUK_ADDRESS 0x52
+	
+	//From doc : Analog stick X returns data from around 35 (fully left) to 228 (fully right), while analog stick Y returns from around 27 to 220. Center for both is around 128. On my Nunchuck i have x 35-232 and y 30-232
+	//So instead of using hard-defined values, i use a larger range and that i will adjust on the fly, that mean to get the nunchuck perfectly calibrated, the user have to roll the joystick around.
+    int nunchuckMinX = 40;
+    int nunchuckMaxX = 223;
+    int nunchuckMinY = 32;
+    int nunchuckMaxY = 215;
+		
+    unsigned long nextStepNunchuck = 4294967295; //ULONG_MAX
+    bool nunchuckActif = false;
+    bool nunchuckStepWrite = true;
+    bool nunchuckPlugged = false;
+    int nunchuckFailCount = 0;
+#endif
+
 // include TinyUSB or HID depending on USB stack option
 #if defined(USE_TINYUSB)
 #include <Adafruit_TinyUSB.h>
@@ -607,7 +625,11 @@ void setup() {
     #ifdef LED_ENABLE
         LedInit();
     #endif // LED_ENABLE
-    
+
+    #ifdef USES_NUNCHUCK
+        nextStepNunchuck = millis()+3000;
+    #endif
+
 #ifdef USE_TINYUSB
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(ENABLE_CLASSIC)
     // is VBUS (USB voltage) detected?
@@ -709,7 +731,7 @@ void setup() {
         SetMode(GunMode_Run);
     }
 }
-
+	
 // (Re-)initializes DFRobot Camera object with wire set by current pins.
 void CameraSet()
 {
@@ -994,6 +1016,80 @@ void loop1()
             }
         #endif // USES_ANALOG
         
+        #ifdef USES_NUNCHUCK
+            unsigned long now = millis();
+            if (nunchuckPlugged && nunchuckActif && now > nextStepNunchuck) {
+                if (nunchuckStepWrite) {
+                    uint8_t reg = 0x00;
+                    Wire1.beginTransmission(NUNCHUK_ADDRESS);
+                    Wire1.write( & reg, 1);
+                    if (Wire1.endTransmission() == 0) {
+                        nunchuckFailCount = 0;
+                        nunchuckStepWrite = false;
+                        nextStepNunchuck = now + 5;
+                    } else {
+                        nunchuckFailCount++;
+                        nextStepNunchuck = now + 20;
+                    }
+                } else {
+                    uint8_t buf[6];
+                    Wire1.requestFrom(NUNCHUK_ADDRESS, 6);
+                    for (int i = 0; i < 6 && Wire1.available(); i++) {
+                        buf[i] = Wire1.read();
+                    }
+
+                    if (buf[0] == 0 || buf[0] == 255 || buf[1] == 0 || buf[1] == 255) {
+                        //Invalid buffer
+                        nunchuckStepWrite = true;
+                        nextStepNunchuck = now + 10;
+                    } else {
+                        Gamepad16.moveStickNunchuck((uint16_t) buf[0], (uint16_t) buf[1]);
+                        Gamepad16.nunchuckC((~buf[5] >> 1) & 1);
+                        Gamepad16.nunchuckZ((~buf[5] >> 0) & 1);
+                        nunchuckStepWrite = true;
+                        nextStepNunchuck = now + 15;
+                    }
+                }
+                if (nunchuckFailCount >= 10) {
+                    nunchuckPlugged = false;
+                    nunchuckStepWrite = true;
+                    nextStepNunchuck = now + 100;
+                    nunchuckFailCount = 0;
+                }
+            }
+            if (nunchuckPlugged == false && OLED.displayValid && nunchuckActif && now > nextStepNunchuck) {
+                if (nunchuckStepWrite) {
+                    uint8_t reg1[2] = {
+                        0xF0,
+                        0x55
+                    };
+                    Wire1.beginTransmission(NUNCHUK_ADDRESS);
+                    Wire1.write(reg1, 2);
+                    if (Wire1.endTransmission() == 0) {
+                        nunchuckStepWrite = false;
+                        nextStepNunchuck = now + 5;
+                    } else {
+                        nextStepNunchuck = now + 10000;
+                    }
+                } else {
+                    uint8_t reg2[2] = {
+                        0xFB,
+                        0x00
+                    };
+                    Wire1.beginTransmission(NUNCHUK_ADDRESS);
+                    Wire1.write(reg2, 2);
+                    if (Wire1.endTransmission() == 0) {
+                        nunchuckStepWrite = true;
+                        nextStepNunchuck = now + 15;
+                        nunchuckPlugged = true;
+                    } else {
+                        nunchuckStepWrite = true;
+                        nextStepNunchuck = now + 10000;
+                    }
+                }
+            }
+        #endif		
+		
         if(buttons.pressedReleased == EscapeKeyBtnMask) {
             SendEscapeKey();
         }

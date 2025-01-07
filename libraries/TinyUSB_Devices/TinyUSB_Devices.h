@@ -295,16 +295,36 @@ typedef struct {
         uint16_t buttons;     // button bitmask
 } __attribute__ ((packed)) gamepad16Report_s;
 
+#ifdef USES_NUNCHUCK
+	extern int nunchuckMinX;
+	extern int nunchuckMaxX;
+	extern int nunchuckMinY;
+	extern int nunchuckMaxY;
+#endif
+
 class Gamepad16_ {
 private:
   gamepad16Report_s gamepad16Report;
   uint16_t _x = 2048;
   uint16_t _y = 2048;
+  
+  #ifdef USES_NUNCHUCK
+  uint16_t _nunchuckX = 127;
+  uint16_t _nunchuckY = 128;
+  bool _nunchuckC = false;
+  bool _nunchuckZ = false;
+  #endif  
+  
   bool _autoReport = true;
 public:
   Gamepad16_(void);
   void moveCam(uint16_t origX, uint16_t origY);
   void moveStick(uint16_t origX, uint16_t origY);
+  #ifdef USES_NUNCHUCK
+  void moveStickNunchuck(uint16_t origX, uint16_t origY);
+  void nunchuckC(bool isPressed);
+  void nunchuckZ(bool isPressed);
+  #endif
   void press(uint8_t buttonNum);
   void release(uint8_t buttonNum);
   void padUpdate(uint8_t padMask);

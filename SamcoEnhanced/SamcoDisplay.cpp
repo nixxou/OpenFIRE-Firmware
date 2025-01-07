@@ -35,6 +35,20 @@ Adafruit_SSD1306 *display;
 
 ExtDisplay::ExtDisplay() {}
 
+void ExtDisplay::Display()
+{
+	#ifdef USES_NUNCHUCK
+    nunchuckActif = false; 
+    display->display();
+    unsigned long now = millis();
+    if(nextStepNunchuck < now + 10) nextStepNunchuck = now + 10;
+    nunchuckStepWrite = true;
+    nunchuckActif = true;
+	#else
+	display->display();
+	#endif
+}
+
 bool ExtDisplay::Begin()
 {
     if(display != nullptr) { display->clearDisplay(); delete display, displayValid = false; }
@@ -93,7 +107,7 @@ void ExtDisplay::TopPanelUpdate(char textPrefix[7], char textInput[16])
         display->setTextColor(WHITE, BLACK);
         display->print(textPrefix);
         display->println(textInput);
-        display->display();
+        Display();
     }
 }
 
@@ -119,7 +133,7 @@ void ExtDisplay::ScreenModeChange(int8_t screenMode, bool isAnalog)
             display->fillRect(0, 0, 128, 16, BLACK);
             display->drawBitmap(24, 0, customSplashBanner, CUSTSPLASHBANN_WIDTH, CUSTSPLASHBANN_HEIGHT, WHITE);
             display->drawBitmap(40, 16, customSplash, CUSTSPLASH_WIDTH, CUSTSPLASH_HEIGHT, WHITE);
-            display->display();
+            Display();
             break;
           case Screen_Init:
             display->setTextSize(2);
@@ -180,7 +194,7 @@ void ExtDisplay::ScreenModeChange(int8_t screenMode, bool isAnalog)
             PrintLife(currentLife);
             break;
         }
-        display->display();
+        Display();
     }
 }
 
@@ -218,7 +232,7 @@ void ExtDisplay::DrawVisibleIR(int pointX[4], int pointY[4])
           pointY[i] = constrain(pointY[i], 16, 64);
           display->fillCircle(pointX[i], pointY[i], 1, WHITE);
         }
-        display->display();
+        Display();
     }
 }
 
@@ -241,7 +255,7 @@ void ExtDisplay::PauseScreenShow(uint8_t currentProf, char name1[16], char name2
         display->setCursor(0, 17+(11*3));
         display->print("Sel> ");
         display->println(name4);
-        display->display();
+        Display();
     }
 }
 
@@ -388,7 +402,7 @@ void ExtDisplay::PauseListUpdate(uint8_t selection)
             }
             break;
         }
-        display->display();
+        Display();
     }
 }
 
@@ -445,7 +459,7 @@ void ExtDisplay::PauseProfileUpdate(uint8_t selection, char name1[16], char name
             display->println(name1);
             break;
         }
-        display->display();
+        Display();
     }
 }
 
@@ -457,7 +471,7 @@ void ExtDisplay::SaveScreen(uint8_t status)
         display->setTextSize(2);
         display->setCursor(24, 24);
         display->println("Saving...");
-        display->display();
+        Display();
     }
 }
 
@@ -537,7 +551,7 @@ void ExtDisplay::PrintAmmo(uint8_t ammo)
                 display->drawBitmap(40+NUMBER_GLYPH_WIDTH+6, 22, number_9, NUMBER_GLYPH_WIDTH, NUMBER_GLYPH_HEIGHT, WHITE);
                 break;
             }
-            display->display();
+            Display();
         } else if(screenState == Screen_Mamehook_Dual) {
             display->fillRect(72, 22, NUMBER_GLYPH_WIDTH, NUMBER_GLYPH_HEIGHT, BLACK);
             switch(ammoLeft) {
@@ -606,7 +620,7 @@ void ExtDisplay::PrintAmmo(uint8_t ammo)
                 display->drawBitmap(72+NUMBER_GLYPH_WIDTH+6, 22, number_9, NUMBER_GLYPH_WIDTH, NUMBER_GLYPH_HEIGHT, WHITE);
                 break;
             }
-            display->display();
+            Display();
         }
     }
 }
@@ -628,7 +642,7 @@ void ExtDisplay::PrintLife(uint8_t life)
                   display->print(life);
                   display->println(" %");
                 }
-                display->display();
+                Display();
             } else {
                 display->fillRect(22, 19, HEART_LARGE_WIDTH*5+4, HEART_LARGE_HEIGHT+22+HEART_LARGE_HEIGHT, BLACK);
                 switch(life) {
@@ -715,7 +729,7 @@ void ExtDisplay::PrintLife(uint8_t life)
                     display->drawBitmap(22+4+HEART_LARGE_WIDTH*4, 41, lifeIcoLarge, HEART_LARGE_WIDTH, HEART_LARGE_HEIGHT, WHITE);
                     break;
                 }
-                display->display();
+                Display();
             }
         } else if(screenState == Screen_Mamehook_Dual) {
             if(lifeBar) {
@@ -729,7 +743,7 @@ void ExtDisplay::PrintLife(uint8_t life)
                   display->print(life);
                   display->println(" %");
                 }
-                display->display();
+                Display();
             } else {
                 display->fillRect(1, 22, HEART_SMALL_WIDTH*5, HEART_SMALL_HEIGHT+20+HEART_SMALL_HEIGHT, BLACK);
                 switch(life) {
@@ -816,7 +830,7 @@ void ExtDisplay::PrintLife(uint8_t life)
                     display->drawBitmap(1+HEART_SMALL_WIDTH*4, 42, lifeIcoSmall, HEART_SMALL_WIDTH, HEART_SMALL_HEIGHT, WHITE);
                     break;
                 }
-                display->display();
+                Display();
             }
         }
     }

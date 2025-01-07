@@ -489,6 +489,54 @@ void AbsMouse5_::release(uint8_t button)
         }
     }
   }
+  
+  #ifdef USES_NUNCHUCK
+  void Gamepad16_::moveStickNunchuck(uint16_t origX, uint16_t origY) {
+	if(origX < 10 || origX > 240 || origY < 10 || origY > 240) return;  
+	  
+	if(origX < nunchuckMinX) nunchuckMinX = origX;
+	if(origX > nunchuckMaxX) nunchuckMaxX = origX;
+	if(origY < nunchuckMinY) nunchuckMinY = origY;
+	if(origY > nunchuckMaxY) nunchuckMaxY = origY;	
+	  
+	int centerX = (nunchuckMinX + nunchuckMaxX)/2.0;
+	int centerY = (nunchuckMinY + nunchuckMaxY)/2.0;
+	if(origX < centerX+2 && origX > centerX-2) origX = centerX;
+	if(origY < centerY+2 && origY > centerY-2) origY = centerY;
+	  
+	
+	//Calibration beetween nunchuck can vary slightly
+	
+    // TODO: inverted output for Cabela's Top Shot Elite sticks, but it might be backwards for others.
+    if(origX != _nunchuckX || origY != _nunchuckY) {
+        _nunchuckX = origX, _nunchuckY = origY;
+        if(stickRight) {
+            gamepad16Report.Rx = map(_nunchuckX, nunchuckMaxX, nunchuckMinX, 32767, -32767);
+            gamepad16Report.Ry = map(_nunchuckY, nunchuckMinY, nunchuckMaxY, 32767, -32767);
+        } else {
+            gamepad16Report.X = map(_nunchuckX, nunchuckMaxX, nunchuckMinX, 32767, -32767);
+            gamepad16Report.Y = map(_nunchuckY, nunchuckMinY, nunchuckMaxY, 32767, -32767);
+        }
+        if(_autoReport) {
+            report();
+        }
+    }
+  }
+
+  void Gamepad16_::nunchuckC(bool isPressed) {
+	if(isPressed != _nunchuckC){
+		_nunchuckC = isPressed;
+		isPressed ? press(PAD_LS) : release(PAD_LS);
+	}		
+  }
+  
+  void Gamepad16_::nunchuckZ(bool isPressed) {
+	if(isPressed != _nunchuckZ){
+		_nunchuckZ = isPressed;
+		isPressed ? press(PAD_RS) : release(PAD_RS);
+	}		
+  }
+  #endif
 
   void Gamepad16_::press(uint8_t buttonNum) {
     bitSet(gamepad16Report.buttons, buttonNum);

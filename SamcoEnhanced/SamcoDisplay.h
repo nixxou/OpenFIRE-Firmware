@@ -26,11 +26,19 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
+#ifdef USES_NUNCHUCK
+extern unsigned long nextStepNunchuck;
+extern bool nunchuckActif;
+extern bool nunchuckStepWrite;
+#endif
+
 class ExtDisplay {
 public:
     /// @brief Constructor
     ExtDisplay();
 
+	void Display();
+	
     /// @brief Attempt to start display using current pin numbers from SamcoPreferences
     /// @return success (true) or fail (false)
     bool Begin();
@@ -114,9 +122,10 @@ public:
 
     /// @brief Which layout we use for serial mode
     uint8_t serialDisplayType = 0;
+	
+	bool displayValid = false;
 
 private:
-    bool displayValid = false;
 
     int8_t screenState = Screen_None;
 
