@@ -26,7 +26,7 @@ FFB::FFB() {}
 
 void FFB::FFBOnScreen()
 {
-    if(SamcoPreferences::toggles.solenoidActive) {                             // (Only activate when the solenoid switch is on!)
+    if(SamcoPreferences::GetSolenoidActive()) {                             // (Only activate when the solenoid switch is on!)
         if(!triggerHeld) {  // If this is the first time we're firing,
             if(burstFireActive && !burstFiring) {  // Are we in burst firing mode?
                 solenoidFirstShot = true;               // Set this so we use the instant solenoid fire path,
@@ -38,46 +38,46 @@ void FFB::FFBOnScreen()
             } else if(!burstFireActive) {  // Or, if we're in normal or rapid fire mode,
                 solenoidFirstShot = true;               // Set the First Shot flag on.
                 SolenoidActivation(0);                  // Just activate the Solenoid already!
-                if(SamcoPreferences::toggles.autofireActive) {          // If we are in auto mode,
+                if(SamcoPreferences::GetAutofireActive()) {          // If we are in auto mode,
                     solenoidFirstShot = false;          // Immediately set this bit off!
                 }
             }
         // Else, these below are all if we've been holding the trigger.
         } else if(burstFiring) {  // If we're in a burst firing sequence,
             BurstFire();                                // Process it.
-        } else if(SamcoPreferences::toggles.autofireActive &&  // Else, if we've been holding the trigger, is the autofire switch active?
+        } else if(SamcoPreferences::GetAutofireActive() &&  // Else, if we've been holding the trigger, is the autofire switch active?
                   !burstFireActive) {                          // (WITHOUT burst firing enabled)
             if(digitalRead(SamcoPreferences::pins.oSolenoid)) {              // Is the solenoid engaged?
-                SolenoidActivation(SamcoPreferences::settings.solenoidFastInterval); // If so, immediately pass the autofire faster interval to solenoid method
+                SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval); // If so, immediately pass the autofire faster interval to solenoid method
             } else {                                    // Or if it's not,
-                SolenoidActivation(SamcoPreferences::settings.solenoidFastInterval * SamcoPreferences::settings.autofireWaitFactor); // We're holding it for longer.
+                SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor); // We're holding it for longer.
             }
         } else if(solenoidFirstShot) {                  // If we aren't in autofire mode, are we waiting for the initial shot timer still?
             if(digitalRead(SamcoPreferences::pins.oSolenoid)) {              // If so, are we still engaged? We need to let it go normally, but maintain the single shot flag.
                 currentMillis = millis();
-                if(currentMillis - previousMillisSol >= SamcoPreferences::settings.solenoidNormalInterval) { // If we finally surpassed the wait threshold...
+                if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval) { // If we finally surpassed the wait threshold...
                     digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);     // Let it go.
                 }
             } else {                                    // We're waiting on the extended wait before repeating in single shot mode.
                 currentMillis = millis();
-                if(currentMillis - previousMillisSol >= SamcoPreferences::settings.solenoidLongInterval) { // If we finally surpassed the LONGER wait threshold...
+                if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidLongInterval) { // If we finally surpassed the LONGER wait threshold...
                     solenoidFirstShot = false;          // We're gonna turn this off so we don't have to pass through this check anymore.
-                    SolenoidActivation(SamcoPreferences::settings.solenoidNormalInterval); // Process it now.
+                    SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval); // Process it now.
                 }
             }
         } else if(!burstFireActive) {                   // if we don't have the single shot wait flag on (holding the trigger w/out autofire)
             if(digitalRead(SamcoPreferences::pins.oSolenoid)) {              // Are we engaged right now?
-                SolenoidActivation(SamcoPreferences::settings.solenoidNormalInterval); // Turn it off with this timer.
+                SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval); // Turn it off with this timer.
             } else {                                    // Or we're not engaged.
-                SolenoidActivation(SamcoPreferences::settings.solenoidNormalInterval * 2); // So hold it that way for twice the normal timer.
+                SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval * 2); // So hold it that way for twice the normal timer.
             }
         }
     // only activate rumbleFF as a fallback if Solenoid is explicitly disabled
-    } else if(SamcoPreferences::toggles.rumbleActive &&
-              SamcoPreferences::toggles.rumbleFF && !rumbleHappened && !triggerHeld) {
+    } else if(SamcoPreferences::GetRumbleActive() &&
+              SamcoPreferences::GetRumbleFF() && !rumbleHappened && !triggerHeld) {
         RumbleActivation();
     }
-    if(SamcoPreferences::toggles.rumbleActive &&  // Is rumble activated,
+    if(SamcoPreferences::GetRumbleActive() &&  // Is rumble activated,
        rumbleHappening && triggerHeld) {  // AND we're in a rumbling command WHILE the trigger's held?
         RumbleActivation();                    // Continue processing the rumble command, to prevent infinite rumble while going from on-screen to off mid-command.
     }
@@ -85,8 +85,8 @@ void FFB::FFBOnScreen()
 
 void FFB::FFBOffScreen()
 {
-    if(SamcoPreferences::toggles.rumbleActive) {  // Only activate if the rumble switch is enabled!
-        if(!SamcoPreferences::toggles.rumbleFF &&
+    if(SamcoPreferences::GetRumbleActive()) {  // Only activate if the rumble switch is enabled!
+        if(!SamcoPreferences::GetRumbleFF() &&
            !rumbleHappened && !triggerHeld) {  // Is this the first time we're rumbling AND only started pulling the trigger (to prevent starting a rumble w/ trigger hold)?
             RumbleActivation();                        // Start a rumble command.
         } else if(rumbleHappening) {  // We are currently processing a rumble command.
@@ -97,7 +97,7 @@ void FFB::FFBOffScreen()
         BurstFire();
     } else if(digitalRead(SamcoPreferences::pins.oSolenoid) && !burstFireActive) { // If the solenoid is engaged, since we're not shooting the screen, shut off the solenoid a'la an idle cycle
         currentMillis = millis();                      // Calibrate current time
-        if(currentMillis - previousMillisSol >= SamcoPreferences::settings.solenoidFastInterval) { // I guess if we're not firing, may as well use the fastest shutoff.
+        if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval) { // I guess if we're not firing, may as well use the fastest shutoff.
             previousMillisSol = currentMillis;
             digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
         }
@@ -106,13 +106,13 @@ void FFB::FFBOffScreen()
 
 void FFB::FFBRelease()
 {
-    if(SamcoPreferences::toggles.solenoidActive) {  // Has the solenoid remain engaged this cycle?
+    if(SamcoPreferences::GetSolenoidActive()) {  // Has the solenoid remain engaged this cycle?
         if(burstFiring) {    // Are we in a burst fire command?
             BurstFire();                                    // Continue processing it.
         } else if(!burstFireActive) { // Else, we're just processing a normal/rapid fire shot.
             solenoidFirstShot = false;                      // Make sure this is unset to prevent "sticking" in single shot mode!
             currentMillis = millis();
-            if(currentMillis - previousMillisSol >= SamcoPreferences::settings.solenoidFastInterval) { // I guess if we're not firing, may as well use the fastest shutoff.
+            if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval) { // I guess if we're not firing, may as well use the fastest shutoff.
                 previousMillisSol = currentMillis;
                 digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);             // Make sure to turn it off.
             }
@@ -120,7 +120,7 @@ void FFB::FFBRelease()
     }
     
     // If Rumble FF is enabled and Autofire is enabled, the motor needs to be disabled when the trigger is released. Otherwise, allow RumbleActivation to deal with the activation timer
-    if(SamcoPreferences::toggles.rumbleFF && SamcoPreferences::toggles.autofireActive) {
+    if(SamcoPreferences::GetRumbleFF() && SamcoPreferences::GetAutofireActive()) {
         if(rumbleHappening || rumbleHappened) {
             digitalWrite(SamcoPreferences::pins.oRumble, LOW);      // Make sure the rumble is OFF.
             rumbleHappening = false;                                // This rumble command is done now.
@@ -153,7 +153,7 @@ void FFB::SolenoidActivation(int solenoidFinalInterval)
                             digitalWrite(SamcoPreferences::pins.oSolenoid, !digitalRead(SamcoPreferences::pins.oSolenoid)); // Flip, flop.
                         }
                     } else { // The solenoid's probably off, not on right now. So that means we should wait a bit longer to fire again.
-                        if(currentMillis - previousMillisSol >= solenoidWarningInterval) { // We're keeping it low for a bit longer, to keep temps stable. Try to give it a bit of time to cool down before we go again.
+                        if(currentMillis - previousMillisSol >= (SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * 5)) { // We're keeping it low for a bit longer, to keep temps stable. Try to give it a bit of time to cool down before we go again.
                             previousMillisSol = currentMillis;
                             digitalWrite(SamcoPreferences::pins.oSolenoid, !digitalRead(SamcoPreferences::pins.oSolenoid));
                         }
@@ -220,16 +220,16 @@ void FFB::RumbleActivation()
 {
     if(rumbleHappening) {                                         // Are we in a rumble command rn?
         currentMillis = millis();                                 // Calibrate a timer to set how long we've been rumbling.
-        if(SamcoPreferences::toggles.rumbleFF) {
-            if(!SamcoPreferences::toggles.autofireActive) {       // We only want to use the rumble timer if Autofire is not active. Otherwise, keep it going
-                if(currentMillis - previousMillisRumble >= SamcoPreferences::settings.rumbleInterval / 2) { // If we've been waiting long enough for this whole rumble command,
+        if(SamcoPreferences::GetRumbleFF()) {
+            if(!SamcoPreferences::GetAutofireActive()) {       // We only want to use the rumble timer if Autofire is not active. Otherwise, keep it going
+                if(currentMillis - previousMillisRumble >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleInterval / 2) { // If we've been waiting long enough for this whole rumble command,
                     digitalWrite(SamcoPreferences::pins.oRumble, LOW);                         // Make sure the rumble is OFF.
                     rumbleHappening = false;                              // This rumble command is done now.
                     rumbleHappened = true;                                // And just to make sure, to prevent holding == repeat rumble commands.
                 }
             }
         } else {
-            if(currentMillis - previousMillisRumble >= SamcoPreferences::settings.rumbleInterval) { // If we've been waiting long enough for this whole rumble command,
+            if(currentMillis - previousMillisRumble >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleInterval) { // If we've been waiting long enough for this whole rumble command,
                 digitalWrite(SamcoPreferences::pins.oRumble, LOW);                         // Make sure the rumble is OFF.
                 rumbleHappening = false;                              // This rumble command is done now.
                 rumbleHappened = true;                                // And just to make sure, to prevent holding == repeat rumble commands.
@@ -237,7 +237,7 @@ void FFB::RumbleActivation()
         }
     } else {                                                      // OR, we're rumbling for the first time.
         previousMillisRumble = millis();                          // Mark this as the start of this rumble command.
-        analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity);
+        analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity);
         rumbleHappening = true;                                   // Mark that we're in a rumble command rn.
     }
 }
@@ -251,10 +251,10 @@ void FFB::BurstFire()
                 burstFireCount++;                                 // Increment the counter.
             }
             if(!digitalRead(SamcoPreferences::pins.oSolenoid)) {  // Now, is the solenoid NOT on right now?
-                SolenoidActivation(SamcoPreferences::settings.solenoidFastInterval * 2);     // Hold it off a bit longer,
+                SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * 2);     // Hold it off a bit longer,
             } else {                         // or if it IS on,
                 burstFireCountLast = burstFireCount;              // sync the counters since we completed one bullet cycle,
-                SolenoidActivation(SamcoPreferences::settings.solenoidFastInterval);         // And start trying to activate the dingus.
+                SolenoidActivation(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval);         // And start trying to activate the dingus.
             }
         #endif // USES_SOLENOID
         return;

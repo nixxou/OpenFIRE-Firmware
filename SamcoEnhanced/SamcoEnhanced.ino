@@ -23,18 +23,36 @@
 #include <Arduino.h>
 #include <RP2040.h>
 #include <OpenFIREBoard.h>
+#include <Arduino.h>
+//#include <LittleFS.h>
+
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+    #include <WiFi.h>
+    #include <AsyncWebServer_RP2040W.h>
+    #include <ArduinoJson.h>
+    
+    
+    // Variables pour la gestion du timing
+    unsigned long lastWiFiCheck = 0;  // Dernière vérification Wi-Fi
+    const unsigned long wifiCheckInterval = 60000;  // 60 secondes
+    unsigned long lastConnectionAttempt = 0;  // Dernière tentative de connexion
+    unsigned long previousWifiConnectStep = 0;
+    int wifiConnectStep = 0;
+    bool connected = false;
+    AsyncWebServer server(80);
+#endif
 
 #ifdef USES_NUNCHUCK
     #include <Wire.h>
     #define NUNCHUK_ADDRESS 0x52
-	
-	//From doc : Analog stick X returns data from around 35 (fully left) to 228 (fully right), while analog stick Y returns from around 27 to 220. Center for both is around 128. On my Nunchuck i have x 35-232 and y 30-232
-	//So instead of using hard-defined values, i use a larger range and that i will adjust on the fly, that mean to get the nunchuck perfectly calibrated, the user have to roll the joystick around.
+    
+    //From doc : Analog stick X returns data from around 35 (fully left) to 228 (fully right), while analog stick Y returns from around 27 to 220. Center for both is around 128. On my Nunchuck i have x 35-232 and y 30-232
+    //So instead of using hard-defined values, i use a larger range and that i will adjust on the fly, that mean to get the nunchuck perfectly calibrated, the user have to roll the joystick around.
     int nunchuckMinX = 40;
     int nunchuckMaxX = 223;
     int nunchuckMinY = 32;
     int nunchuckMaxY = 215;
-		
+        
     unsigned long nextStepNunchuck = 4294967295; //ULONG_MAX
     bool nunchuckActif = false;
     bool nunchuckStepWrite = true;
@@ -69,11 +87,6 @@
     // That said, LEDs are attached to Pins 25(G), 26(B), 27(R).
     #include <WiFiNINA.h>
 #endif // ARDUINO_NANO */
-#ifdef SAMCO_FLASH_ENABLE
-    #include <Adafruit_SPIFlashBase.h>
-#elif SAMCO_EEPROM_ENABLE
-    #include <EEPROM.h>
-#endif // SAMCO_FLASH_ENABLE/EEPROM_ENABLE
 
 
 #include <DFRobotIRPositionEx.h>
@@ -317,11 +330,13 @@ enum RunMode_e {
 // defaults can be populated here, but any values in EEPROM/Flash will override these.
 // top/bottom/left/right offsets, TLled/TRled, adjX/adjY, sensitivity, runmode, button mask mapped to profile, layout toggle, color, name
 SamcoPreferences::ProfileData_t profileData[ProfileCount] = {
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_A,      false, 0xFF0000, "Profile A"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_B,      false, 0x00FF00, "Profile B"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Start,  false, 0x0000FF, "Profile Start"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Select, false, 0xFF00FF, "Profile Select"}
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_A,      false, 0xFF0000, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile A"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_B,      false, 0x00FF00, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile B"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Start,  false, 0x0000FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile Start"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Select, false, 0xFF00FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile Select"}
 };
+
+
 //  ------------------------------------------------------------------------------------------------------
 
 int mouseX;
@@ -387,10 +402,10 @@ bool buttonPressed = false;                      // Sanity check.
     #endif // USES_SOLENOID
     #ifdef USES_DISPLAY
     bool serialDisplayChange = false;                // Signal of pending display update, sent by Core 2 to be used by Core 1 in dual core configs
-    uint16_t serialLifeCount = 0;		     // Changed from uint16_t for games with life values > 255
+    uint16_t serialLifeCount = 0;             // Changed from uint16_t for games with life values > 255
     uint8_t serialAmmoCount = 0;
-    uint16_t dispMaxLife = 0; 			     // Max value for life in lifebar mode (100%)
-    uint16_t dispLifePercentage = 0; 		     // Actual value to show in lifebar mode #%
+    uint16_t dispMaxLife = 0;                  // Max value for life in lifebar mode (100%)
+    uint16_t dispLifePercentage = 0;              // Actual value to show in lifebar mode #%
     #endif // USES_DISPLAY
 #endif // MAMEHOOKER
 
@@ -484,6 +499,7 @@ SamcoPreferences::Preferences_t SamcoPreferences::profiles = {
     0, // default profile
 };
 
+
 SamcoPreferences::TogglesMap_t SamcoPreferences::toggles;
 SamcoPreferences::PinsMap_t SamcoPreferences::pins;
 SamcoPreferences::SettingsMap_t SamcoPreferences::settings;
@@ -523,14 +539,13 @@ Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel* externPixel;
 #endif // CUSTOM_NEOPIXEL
 
-#ifdef SAMCO_EEPROM_ENABLE
 // EEPROM non-volatile storage
 static const char* NVRAMlabel = "EEPROM";
 
 // flag to indicate if non-volatile storage is available
 // unconditional for EEPROM
 bool nvAvailable = true;
-#endif
+
 
 // non-volatile preferences error code
 int nvPrefsError = SamcoPreferences::Error_NoStorage;
@@ -565,8 +580,11 @@ DFRobotIRPositionEx *dfrIRPos;
 // The main show!
 void setup() {
     // initialize EEPROM device. Arduino AVR has a 1k flash, so use that.
-    EEPROM.begin(1024);
+    //EEPROM.begin(1024);
 
+
+  
+  
     #ifdef ARDUINO_ADAFRUIT_ITSYBITSY_RP2040
         // SAMCO 1.1 needs Pin 5 normally HIGH for the camera
         pinMode(14, OUTPUT);
@@ -574,7 +592,7 @@ void setup() {
     #endif // ARDUINO_ADAFRUIT_ITSYBITSY_RP2040
 
     SamcoPreferences::LoadPresets();
-    
+    //SamcoPreferences::baseJson = SamcoPreferences::structuresToJson();
     if(nvAvailable) {
         LoadPreferences();
         if(nvPrefsError == SamcoPreferences::Error_NoData) {
@@ -593,15 +611,18 @@ void setup() {
 
                 // set the run mode
                 if(profileData[selectedProfile].runMode < RunMode_Count) {
+                    Serial.println("Change run mode");
                     runMode = (RunMode_e)profileData[selectedProfile].runMode;
                 }
             }
+            /*
             SamcoPreferences::LoadToggles();
             if(SamcoPreferences::toggles.customPinsInUse) {
                 SamcoPreferences::LoadPins();
             }
             SamcoPreferences::LoadSettings();
             SamcoPreferences::LoadUSBID();
+            */
         }
     }
  
@@ -618,7 +639,7 @@ void setup() {
 
     // Initialize DFRobot Camera Wires & Object
     CameraSet();
-
+    Serial.println("Camera set");
     // initialize buttons & feedback devices
     buttons.Begin();
     FeedbackSet();
@@ -649,12 +670,15 @@ void setup() {
         }
     }
     #else
+    Serial.println("init usb");
     // Initializing the USB devices chunk.
     TinyUSBDevices.begin(1);
     // wait until device mounted
     while(!USBDevice.mounted()) { yield(); }
+
     Serial.begin(9600);   // 9600 = 1ms data transfer rates, default for MAMEHOOKER COM devices.
     Serial.setTimeout(0);
+
     #endif // ARDUINO_RASPBERRY_PI_PICO_W
 #else
     // was getting weird hangups... maybe nothing, or maybe related to dragons, so wait a bit
@@ -668,6 +692,21 @@ void setup() {
 
     OpenFIREper.source(profileData[selectedProfile].adjX, profileData[selectedProfile].adjY);
     OpenFIREper.deinit(0);
+    
+    Serial.println("before sanity check");
+    #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+        WiFi.mode(WIFI_STA);
+        Serial.println(SamcoPreferences::settings.apName);
+        Serial.println(SamcoPreferences::settings.apPassword);
+        
+        if(SamcoPreferences::settings.apName == ""){
+            wifiConnectStep = 20;    
+        }
+        else{
+            WiFi.begin(SamcoPreferences::settings.apName, SamcoPreferences::settings.apPassword);            
+            wifiConnectStep=1;
+        }
+    #endif
 
     // First boot sanity checks.
     // Check if loading has failde
@@ -676,6 +715,7 @@ void setup() {
      profileData[selectedProfile].bottomOffset == 0 && 
      profileData[selectedProfile].leftOffset == 0 &&
      profileData[selectedProfile].rightOffset == 0)) {
+         Serial.println("first boot");
         // SHIT, it's a first boot! Prompt to start calibration.
         unsigned int timerIntervalShort = 600;
         unsigned int timerInterval = 1000;
@@ -730,8 +770,9 @@ void setup() {
         // this will turn off the DotStar/RGB LED and ensure proper transition to Run
         SetMode(GunMode_Run);
     }
+    Serial.println("all setup done");
 }
-	
+    
 // (Re-)initializes DFRobot Camera object with wire set by current pins.
 void CameraSet()
 {
@@ -771,14 +812,14 @@ void FeedbackSet()
         if(SamcoPreferences::pins.oRumble >= 0) {
             pinMode(SamcoPreferences::pins.oRumble, OUTPUT);
         } else {
-            SamcoPreferences::toggles.rumbleActive = false;
+            SamcoPreferences::DisableRumbleActive();
         }
     #endif // USES_RUMBLE
     #ifdef USES_SOLENOID
         if(SamcoPreferences::pins.oSolenoid >= 0) {
             pinMode(SamcoPreferences::pins.oSolenoid, OUTPUT);
         } else {
-            SamcoPreferences::toggles.solenoidActive = false;
+            SamcoPreferences::DisableSolenoidActive();
         }
     #endif // USES_SOLENOID
     #ifdef USES_SWITCHES
@@ -831,13 +872,13 @@ void FeedbackSet()
                 uint32_t color;
                 switch(i) {
                   case 0:
-                    color = SamcoPreferences::settings.customLEDcolor1;
+                    color = SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor1;
                     break;
                   case 1:
-                    color = SamcoPreferences::settings.customLEDcolor2;
+                    color = SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor2;
                     break;
                   case 2:
-                    color = SamcoPreferences::settings.customLEDcolor3;
+                    color = SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor3;
                     break;
                 }
                 externPixel->setPixelColor(i, color);
@@ -974,10 +1015,125 @@ void setup1()
 // currently handles all button & serial processing when Core 0 is in ExecRunMode()
 void loop1()
 {
+    #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+    if(wifiConnectStep >=1 && wifiConnectStep < 100){
+        if(wifiConnectStep>=1 && wifiConnectStep<90){
+            unsigned long currentMillis = millis();
+            if (currentMillis - previousWifiConnectStep >= 500) {
+                previousWifiConnectStep = currentMillis;
+                if(WiFi.status() != WL_CONNECTED){
+                    Serial.print(".");
+                    wifiConnectStep++;            
+                }
+                else{
+                    Serial.println("to next step");
+                    wifiConnectStep = 20;
+                }
+            }
+        }
+        if(wifiConnectStep>=20 && wifiConnectStep < 100){
+            if (WiFi.status() == WL_CONNECTED) {
+                Serial.println();
+                Serial.print("Connecté à Wi-Fi. IP Adresse : ");
+                Serial.println(WiFi.localIP());
+                connected = true;
+            }
+
+            if (!connected) {
+                Serial.println("Échec de la connexion. Création d'un point d'accès.");
+
+                // Réinitialise les paramètres précédents
+                WiFi.persistent(false);
+                WiFi.disconnect(true);
+
+                // Configure le mode AP
+                WiFi.mode(WIFI_OFF);
+                WiFi.mode(WIFI_AP);
+
+                // Configure l'adresse IP du point d'accès
+                IPAddress apIP(192, 168, 1, 1);
+                IPAddress netMask(255, 255, 255, 0);
+                WiFi.softAPConfig(apIP, apIP, netMask);
+
+
+                WiFi.softAP(SamcoPreferences::usb.deviceName, "openFire", 1); // Nom de l'AP et mot de passe
+                
+                
+                Serial.print("Point d'accès créé avec l'IP : ");
+                Serial.println(WiFi.softAPIP());
+            }
+            // Serveur web
+            server.on("/", HTTP_GET, handleRoot);
+            
+            // Serve la page avec une grande zone de texte contenant le JSON
+            server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
+
+              
+              String jsonPayload;
+              int params = request->params();
+              for (int i = 0; i < params; i++) {
+                AsyncWebParameter* p = request->getParam(i);
+                if (p->name() == "jsonData") {
+                  jsonPayload = p->value();
+                }
+              }
+              String txtResult = "Config edited !";
+              int code = 200;
+              // Vérification du JSON
+              
+              if (!SamcoPreferences::JsonToStructures(jsonPayload)) {
+                  code = 400;
+                  txtResult = "Error on JSON";
+              }
+              else{
+                  SamcoPreferences::SaveProfiles();
+                  /*
+                  SavePreferences();
+                  
+                    SamcoPreferences::LoadPresets();
+                    SamcoPreferences::LoadToggles();
+                    SamcoPreferences::LoadPins();
+                    
+                    SamcoPreferences::LoadSettings();
+                    SamcoPreferences::LoadUSBID();
+                */
+                      
+                                    
+                  
+                  
+              }
+              
+
+                String jsonString = SamcoPreferences::structuresToJson();
+                String html = R"(
+                  <html>
+                  <head>
+                      <title>Config</title>
+                  </head>
+                  <body>
+                      <h1>)" + txtResult + R"(</h1>
+                      <form action="/save" method="POST">
+                          <textarea name="jsonData" rows="15" cols="50">)" + jsonString + R"(
+                          </textarea><br><br>
+                          <input type="submit" value="Sauvegarder">
+                      </form>
+                  </body>
+                  </html>
+                )";  
+                  request->send(code, "text/html", html);
+
+            });                    
+            server.begin();
+            wifiConnectStep = 100;                
+        }
+    }
+    #endif        
+    
+    
     #ifdef USES_ANALOG
         unsigned long lastAnalogPoll = millis();
     #endif // USES_ANALOG
-    while(gunMode == GunMode_Run) {
+    if(gunMode == GunMode_Run) {
         // For processing the trigger specifically.
         // (buttons.debounced is a binary variable intended to be read 1 bit at a time, with the 0'th point == rightmost == decimal 1 == trigger, 3 = start, 4 = select)
         buttons.Poll(0);
@@ -1088,8 +1244,8 @@ void loop1()
                     }
                 }
             }
-        #endif		
-		
+        #endif        
+        
         if(buttons.pressedReleased == EscapeKeyBtnMask) {
             SendEscapeKey();
         }
@@ -1130,9 +1286,53 @@ void loop1()
                 // at this point, the other core should be stopping us now.
             }
         }
+        #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+        checkWiFiConnection();
+        #endif
     }
+    #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+    checkWiFiConnection();
+    #endif
 }
 #endif // ARDUINO_ARCH_RP2040 || DUAL_CORE
+
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+void checkWiFiConnection() {
+  unsigned long currentMillis = millis();
+  
+  // Se reconnecter si nécessaire, mais seulement toutes les 60 secondes
+  if (wifiConnectStep >= 100 && WiFi.status() != WL_CONNECTED && (currentMillis - lastConnectionAttempt >= wifiCheckInterval)) {
+    Serial.println("Déconnexion Wi-Fi détectée, tentative de reconnexion...");
+    WiFi.disconnect();  // Déconnecter s'il y a un problème
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(SamcoPreferences::settings.apName, SamcoPreferences::settings.apPassword);
+    lastConnectionAttempt = currentMillis;  // Enregistrer le moment de la tentative de connexion
+  }
+}
+
+void handleRoot(AsyncWebServerRequest *request) {
+  String jsonString = SamcoPreferences::structuresToJson();
+  
+  String html = R"(
+    <html>
+    <head>
+        <title>Config</title>
+    </head>
+    <body>
+        <h1>Edit Config</h1>
+        <form action="/save" method="POST">
+            <textarea name="jsonData" rows="15" cols="50">)" + jsonString + R"(
+            </textarea><br><br>
+            <input type="submit" value="Sauvegarder">
+        </form>
+    </body>
+    </html>
+  )";
+  
+  request->send(200, "text/html", html);
+}
+#endif
+
 
 // Main core events hub
 // splits off into subsequent ExecModes depending on circumstances
@@ -1144,7 +1344,7 @@ void loop()
 
     if(SamcoPreferences::toggles.holdToPause && pauseHoldStarted) {
         #ifdef USES_RUMBLE
-            analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity);
+            analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity);
             delay(300);
             digitalWrite(SamcoPreferences::pins.oRumble, LOW);
         #endif // USES_RUMBLE
@@ -1329,7 +1529,7 @@ void loop()
                         }
                         #ifdef USES_RUMBLE
                             for(byte i = 0; i < 3; i++) {
-                                analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity);
+                                analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity);
                                 delay(80);
                                 digitalWrite(SamcoPreferences::pins.oRumble, LOW);
                                 delay(50);
@@ -1438,11 +1638,11 @@ void ExecRunMode()
         #ifdef USES_SWITCHES
             #ifdef USES_RUMBLE
                 if(SamcoPreferences::pins.sRumble >= 0) {
-                    SamcoPreferences::toggles.rumbleActive = !digitalRead(SamcoPreferences::pins.sRumble);
+                    SamcoPreferences::SetRumbleActive(!digitalRead(SamcoPreferences::pins.sRumble), true);
                     #ifdef MAMEHOOKER
                     if(!serialMode) {
                     #endif // MAMEHOOKER
-                        if(!SamcoPreferences::toggles.rumbleActive && OF_FFB.rumbleHappening) {
+                        if(!SamcoPreferences::GetRumbleActive() && OF_FFB.rumbleHappening) {
                             OF_FFB.FFBShutdown();
                         }
                     #ifdef MAMEHOOKER
@@ -1452,11 +1652,11 @@ void ExecRunMode()
             #endif // USES_RUMBLE
             #ifdef USES_SOLENOID
                 if(SamcoPreferences::pins.sSolenoid >= 0) {
-                    SamcoPreferences::toggles.solenoidActive = !digitalRead(SamcoPreferences::pins.sSolenoid);
+                    SamcoPreferences::SetSolenoidActive(!digitalRead(SamcoPreferences::pins.sSolenoid),true);
                     #ifdef MAMEHOOKER
                     if(!serialMode) {
                     #endif // MAMEHOOKER
-                        if(!SamcoPreferences::toggles.solenoidActive && digitalRead(SamcoPreferences::pins.oSolenoid)) {
+                        if(!SamcoPreferences::GetSolenoidActive() && digitalRead(SamcoPreferences::pins.oSolenoid)) {
                             OF_FFB.FFBShutdown();
                         }
                     #ifdef MAMEHOOKER
@@ -1465,7 +1665,7 @@ void ExecRunMode()
                 }
             #endif // USES_SOLENOID
             if(SamcoPreferences::pins.sAutofire >= 0) {
-                SamcoPreferences::toggles.autofireActive = !digitalRead(SamcoPreferences::pins.sAutofire);
+                SamcoPreferences::SetAutofireActive(!digitalRead(SamcoPreferences::pins.sAutofire),true);
             }
         #endif // USES_SWITCHES
 
@@ -1519,7 +1719,7 @@ void ExecRunMode()
                 // so just do it here using the signal sent by it.
                 if(serialDisplayChange) {
                     if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Ammo) { OLED.PrintAmmo(serialAmmoCount); }
-		    else if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Life && OLED.lifeBar) { OLED.PrintLife(dispLifePercentage); } 
+            else if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Life && OLED.lifeBar) { OLED.PrintLife(dispLifePercentage); } 
                     else if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Life) { OLED.PrintLife(serialLifeCount); }
                     else if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Both && OLED.lifeBar) {
                       OLED.PrintAmmo(serialAmmoCount);
@@ -1566,11 +1766,11 @@ void ExecRunMode()
                 if(t - pauseHoldStartstamp > SamcoPreferences::settings.pauseHoldLength) {
                     // MAKE SURE EVERYTHING IS DISENGAGED:
                     OF_FFB.FFBShutdown();
-		                Keyboard.releaseAll();
+                        Keyboard.releaseAll();
                     AbsMouse5.releaseAll();
                     offscreenBShot = false;
                     buttonPressed = false;
-	    	            pauseModeSelection = PauseMode_Calibrate;
+                        pauseModeSelection = PauseMode_Calibrate;
                     SetMode(GunMode_Pause);
                     buttons.ReportDisable();
                     return;
@@ -1580,11 +1780,11 @@ void ExecRunMode()
             if(buttons.pressedReleased == EnterPauseModeBtnMask || buttons.pressedReleased == BtnMask_Home) {
                 // MAKE SURE EVERYTHING IS DISENGAGED:
                 OF_FFB.FFBShutdown();
-		            Keyboard.releaseAll();
+                    Keyboard.releaseAll();
                 AbsMouse5.releaseAll();
                 offscreenBShot = false;
                 buttonPressed = false;
-		            SetMode(GunMode_Pause);
+                    SetMode(GunMode_Pause);
                 buttons.ReportDisable();
                 return;
             }
@@ -2117,12 +2317,12 @@ void ExecCalMode()
         SetMode(GunMode_Run);
     }
     #ifdef USES_RUMBLE
-        if(SamcoPreferences::toggles.rumbleActive) {
-            analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity);
+        if(SamcoPreferences::GetRumbleActive()) {
+            analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity);
             delay(80);
             digitalWrite(SamcoPreferences::pins.oRumble, false);
             delay(50);
-            analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity);
+            analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity);
             delay(125);
             digitalWrite(SamcoPreferences::pins.oRumble, false);
         }
@@ -2559,23 +2759,26 @@ void SerialProcessingDocked()
                           #ifdef USES_RUMBLE
                           case SamcoPreferences::Bool_Rumble:
                             Serial.read(); // nomf
-                            SamcoPreferences::toggles.rumbleActive = Serial.read() - '0';
-                            SamcoPreferences::toggles.rumbleActive = constrain(SamcoPreferences::toggles.rumbleActive, 0, 1);
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive = Serial.read() - '0';
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive = constrain(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive, 0, 1);                            
+                            SamcoPreferences::temporarySerialSettings.rumbleActive = -1;
                             Serial.println("OK: Toggled Rumble setting.");
                             break;
                           #endif
                           #ifdef USES_SOLENOID
                           case SamcoPreferences::Bool_Solenoid:
                             Serial.read(); // nomf
-                            SamcoPreferences::toggles.solenoidActive = Serial.read() - '0';
-                            SamcoPreferences::toggles.solenoidActive = constrain(SamcoPreferences::toggles.solenoidActive, 0, 1);
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive = Serial.read() - '0';
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive = constrain(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive, 0, 1);                                
+                            SamcoPreferences::temporarySerialSettings.solenoidActive = -1;
                             Serial.println("OK: Toggled Solenoid setting.");
                             break;
                           #endif
                           case SamcoPreferences::Bool_Autofire:
                             Serial.read(); // nomf
-                            SamcoPreferences::toggles.autofireActive = Serial.read() - '0';
-                            SamcoPreferences::toggles.autofireActive = constrain(SamcoPreferences::toggles.autofireActive, 0, 1);
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive = Serial.read() - '0';
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive = constrain(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive, 0, 1);                            
+                            SamcoPreferences::temporarySerialSettings.autofireActive = -1;    
                             Serial.println("OK: Toggled Autofire setting.");
                             break;
                           case SamcoPreferences::Bool_SimpleMenu:
@@ -2606,8 +2809,9 @@ void SerialProcessingDocked()
                             break;
                           case SamcoPreferences::Bool_RumbleFF:
                             Serial.read(); // nomf
-                            SamcoPreferences::toggles.rumbleFF = Serial.read() - '0';
-                            SamcoPreferences::toggles.rumbleFF = constrain(SamcoPreferences::toggles.rumbleFF, 0, 1);
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF = Serial.read() - '0';
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF = constrain(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF, 0, 1);
+                            SamcoPreferences::temporarySerialSettings.rumbleFF = -1;                            
                             Serial.println("OK: Toggled Rumble FF setting.");
                             break;
                           default:
@@ -2841,37 +3045,37 @@ void SerialProcessingDocked()
                           #ifdef USES_RUMBLE
                           case SamcoPreferences::Setting_RumbleIntensity:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.rumbleIntensity = Serial.parseInt();
-                            SamcoPreferences::settings.rumbleIntensity = constrain(SamcoPreferences::settings.rumbleIntensity, 0, 255);
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity = constrain(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity, 0, 255);
                             Serial.println("OK: Set Rumble Intensity setting.");
                             break;
                           case SamcoPreferences::Setting_RumbleInterval:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.rumbleInterval = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleInterval = Serial.parseInt();
                             Serial.println("OK: Set Rumble Length setting.");
                             break;
                           #endif
                           #ifdef USES_SOLENOID
                           case SamcoPreferences::Setting_SolenoidNormInt:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.solenoidNormalInterval = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval = Serial.parseInt();
                             Serial.println("OK: Set Solenoid Normal Interval setting.");
                             break;
                           case SamcoPreferences::Setting_SolenoidFastInt:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.solenoidFastInterval = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval = Serial.parseInt();
                             Serial.println("OK: Set Solenoid Fast Interval setting.");
                             break;
                           case SamcoPreferences::Setting_SolenoidLongInt:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.solenoidLongInterval = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidLongInterval = Serial.parseInt();
                             Serial.println("OK: Set Solenoid Hold Length setting.");
                             break;
                           #endif
                           case SamcoPreferences::Setting_AutofireFactor:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.autofireWaitFactor = Serial.parseInt();
-                            SamcoPreferences::settings.autofireWaitFactor = constrain(SamcoPreferences::settings.autofireWaitFactor, 2, 4);
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor = constrain(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor, 2, 4);
                             Serial.println("OK: Set Autofire Wait Factor setting.");
                             break;
                           case SamcoPreferences::Setting_PauseHoldLength:
@@ -2894,17 +3098,17 @@ void SerialProcessingDocked()
                             break;
                           case SamcoPreferences::Setting_Color1:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.customLEDcolor1 = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor1 = Serial.parseInt();
                             Serial.println("OK: Set Static Color 1 setting.");
                             break;
                           case SamcoPreferences::Setting_Color2:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.customLEDcolor2 = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor2 = Serial.parseInt();
                             Serial.println("OK: Set Static Color 2 setting.");
                             break;
                           case SamcoPreferences::Setting_Color3:
                             Serial.read(); // nomf
-                            SamcoPreferences::settings.customLEDcolor3 = Serial.parseInt();
+                            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor3 = Serial.parseInt();
                             Serial.println("OK: Set Static Color 3 setting.");
                             break;
                           #endif
@@ -3044,15 +3248,26 @@ void SerialProcessingDocked()
                 switch(serialInput) {
                   case 'b':
                     Serial.printf("%i,%i,%i,%i,%i,%i,%i,%i,%i\r\n",
+                    /*
                     SamcoPreferences::toggles.customPinsInUse,
-                    SamcoPreferences::toggles.rumbleActive,
-                    SamcoPreferences::toggles.solenoidActive,
-                    SamcoPreferences::toggles.autofireActive,
+                    false,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive,
+                    false,
                     SamcoPreferences::toggles.simpleMenu,
                     SamcoPreferences::toggles.holdToPause,
                     SamcoPreferences::toggles.commonAnode,
                     SamcoPreferences::toggles.lowButtonMode,
-                    SamcoPreferences::toggles.rumbleFF
+                    false                    
+                    */
+                    SamcoPreferences::toggles.customPinsInUse,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive,
+                    SamcoPreferences::toggles.simpleMenu,
+                    SamcoPreferences::toggles.holdToPause,
+                    SamcoPreferences::toggles.commonAnode,
+                    SamcoPreferences::toggles.lowButtonMode,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF
                     );
                     break;
                   case 'p':
@@ -3093,18 +3308,18 @@ void SerialProcessingDocked()
                     break;
                   case 's':
                     Serial.printf("%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\r\n",
-                    SamcoPreferences::settings.rumbleIntensity,
-                    SamcoPreferences::settings.rumbleInterval,
-                    SamcoPreferences::settings.solenoidNormalInterval,
-                    SamcoPreferences::settings.solenoidFastInterval,
-                    SamcoPreferences::settings.solenoidLongInterval,
-                    SamcoPreferences::settings.autofireWaitFactor,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleInterval,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidLongInterval,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor,
                     SamcoPreferences::settings.pauseHoldLength,
                     SamcoPreferences::settings.customLEDcount,
                     SamcoPreferences::settings.customLEDstatic,
-                    SamcoPreferences::settings.customLEDcolor1,
-                    SamcoPreferences::settings.customLEDcolor2,
-                    SamcoPreferences::settings.customLEDcolor3
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor1,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor2,
+                    SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].customLEDcolor3
                     );
                     break;
                   case 'P':
@@ -3146,14 +3361,14 @@ void SerialProcessingDocked()
                     #ifdef USES_SOLENOID
                     case 's':
                       digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);
-                      delay(SamcoPreferences::settings.solenoidNormalInterval);
+                      delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval);
                       digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
                       break;
                     #endif // USES_SOLENOID
                     #ifdef USES_RUMBLE
                     case 'r':
-                      analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity);
-                      delay(SamcoPreferences::settings.rumbleInterval);
+                      analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity);
+                      delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleInterval);
                       digitalWrite(SamcoPreferences::pins.oRumble, LOW);
                       break;
                     #endif // USES_RUMBLE
@@ -3356,14 +3571,14 @@ void SerialProcessing()
                 switch(serialInput) {
                     // disable
                     case '0':
-                      if(SamcoPreferences::pins.sSolenoid == -1 && SamcoPreferences::pins.oSolenoid >= 0) { SamcoPreferences::toggles.solenoidActive = true; }
-                      if(SamcoPreferences::pins.oRumble >= 0) { SamcoPreferences::toggles.rumbleFF = false; }
+                      if(SamcoPreferences::pins.sSolenoid == -1 && SamcoPreferences::pins.oSolenoid >= 0) { SamcoPreferences::SetSolenoidActive(true,true); }
+                      if(SamcoPreferences::pins.oRumble >= 0) { SamcoPreferences::SetRumbleFF(false,true); }
                       break;
                     // enable
                     case '1':
-                      if(SamcoPreferences::pins.sRumble == -1 && SamcoPreferences::pins.oRumble >= 0) { SamcoPreferences::toggles.rumbleActive = true; }
-                      if(SamcoPreferences::pins.sSolenoid == -1 && SamcoPreferences::pins.oSolenoid >= 0) { SamcoPreferences::toggles.solenoidActive = false; }
-                      if(SamcoPreferences::pins.oRumble >= 0) { SamcoPreferences::toggles.rumbleFF = true; }
+                      if(SamcoPreferences::pins.sRumble == -1 && SamcoPreferences::pins.oRumble >= 0) { SamcoPreferences::SetRumbleActive(true,true); }
+                      if(SamcoPreferences::pins.sSolenoid == -1 && SamcoPreferences::pins.oSolenoid >= 0) { SamcoPreferences::SetSolenoidActive(false,true); }
+                      if(SamcoPreferences::pins.oRumble >= 0) { SamcoPreferences::SetRumbleFF(true,true); }
                       break;
                 }
                 OF_FFB.FFBShutdown();
@@ -3375,12 +3590,12 @@ void SerialProcessing()
                 serialInput = Serial.read();                           // Read the next.
                 if(serialInput == '1') {
                     OF_FFB.burstFireActive = true;
-                    SamcoPreferences::toggles.autofireActive = false;
+                    SamcoPreferences::SetAutofireActive(false,true);
                 } else if(serialInput == '2') {
-                    SamcoPreferences::toggles.autofireActive = true;
+                    SamcoPreferences::SetAutofireActive(true,true);
                     OF_FFB.burstFireActive = false;
                 } else if(serialInput == '0') {
-                    SamcoPreferences::toggles.autofireActive = false;
+                    SamcoPreferences::SetAutofireActive(false,true);
                     OF_FFB.burstFireActive = false;
                 }
                 break;
@@ -3405,7 +3620,7 @@ void SerialProcessing()
                 }
                 if(Serial.read() == 'B') {
                     OLED.lifeBar = true;
-		    dispMaxLife = 0;
+            dispMaxLife = 0;
                 } else { OLED.lifeBar = false; }
                 // prevent glitching if currently in pause mode
                 if(gunMode == GunMode_Run) {
@@ -3717,10 +3932,10 @@ void SerialProcessing()
                         }
                     }
                     serialLifeCount = atoi(serialInputS);
-		    if (OLED.lifeBar){
-		    	if (serialLifeCount > dispMaxLife) { dispMaxLife = serialLifeCount; }
-			dispLifePercentage = (100 * serialLifeCount) / dispMaxLife; // Calculate the Life % to show 
-		    }
+            if (OLED.lifeBar){
+                if (serialLifeCount > dispMaxLife) { dispMaxLife = serialLifeCount; }
+            dispLifePercentage = (100 * serialLifeCount) / dispMaxLife; // Calculate the Life % to show 
+            }
                     break;
                   }
                 }
@@ -3745,7 +3960,7 @@ void SerialHandling()
     // The only exception is rumble PULSE bits, where we actually do need to calculate that ourselves.
 
     #ifdef USES_SOLENOID
-      if(SamcoPreferences::toggles.solenoidActive) {
+      if(SamcoPreferences::GetSolenoidActive()) {
           if(bitRead(serialQueue, SerialQueue_Solenoid)) {          // If the solenoid digital bit is on,
               digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);      // Make it go!
           } else if(bitRead(serialQueue, SerialQueue_SolPulse)) {   // if the solenoid pulse bit is on,
@@ -3755,13 +3970,13 @@ void SerialHandling()
                   serialSolPulses++;                                     // Cheating and scooting the pulses bit up.
               } else if(serialSolPulsesLast <= serialSolPulses) {   // Have we met the pulses quota?
                   if(digitalRead(SamcoPreferences::pins.oSolenoid)) {
-                      if(millis() - serialSolPulsesLastUpdate >= SamcoPreferences::settings.solenoidNormalInterval) {
+                      if(millis() - serialSolPulsesLastUpdate >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval) {
                           digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);  // Start pulsing it off.
                           serialSolPulsesLast++;                         // Iterate that we've done a pulse cycle,
                           serialSolPulsesLastUpdate = millis();          // Timestamp our last pulse event.
                       }
                   } else {
-                      if(millis() - serialSolPulsesLastUpdate >= SamcoPreferences::settings.solenoidFastInterval * SamcoPreferences::settings.autofireWaitFactor) {
+                      if(millis() - serialSolPulsesLastUpdate >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor) {
                           digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH); // Start pulsing it on.
                           serialSolPulsesLastUpdate = millis();          // Timestamp our last pulse event.
                       }
@@ -3778,30 +3993,30 @@ void SerialHandling()
       }
   #endif // USES_SOLENOID
   #ifdef USES_RUMBLE
-      if(SamcoPreferences::toggles.rumbleActive) {
+      if(SamcoPreferences::GetRumbleActive()) {
           if(bitRead(serialQueue, SerialQueue_Rumble)) {                 // Is the rumble on bit set?
-              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity); // turn/keep it on.
+              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity); // turn/keep it on.
               //bitClear(serialQueue, 3);
           } else if(bitRead(serialQueue, SerialQueue_RumbPulse)) {  // or if the rumble pulse bit is set,
               if(!serialRumbPulsesLast) {                           // is the pulses last bit set to off?
-                  analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity / 3); // we're starting fresh, so use the stage 0 value.
+                  analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity / 3); // we're starting fresh, so use the stage 0 value.
                   serialRumbPulseStage = 0;                              // Set that we're at stage 0.
                   serialRumbPulsesLast = 1;                              // Set that we've started a pulse rumble command, and start counting how many pulses we're doing.
               } else if(serialRumbPulsesLast <= serialRumbPulses) { // Have we exceeded the set amount of pulses the rumble command called for?
                   if(millis() - serialRumbPulsesLastUpdate > serialRumbPulsesLength) { // have we waited enough time between pulse stages?
                       switch(serialRumbPulseStage) {                     // If so, let's start processing.
                           case 0:                                        // Basically, each case
-                              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity); // bumps up the intensity, (lowest to rising)
+                              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity); // bumps up the intensity, (lowest to rising)
                               serialRumbPulseStage++;                    // and increments the stage of the pulse.
                               serialRumbPulsesLastUpdate = millis();     // and timestamps when we've had updated this last.
                               break;                                     // Then quits the switch.
                           case 1:
-                              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity / 2); // (rising to peak)
+                              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity / 2); // (rising to peak)
                               serialRumbPulseStage++;
                               serialRumbPulsesLastUpdate = millis();
                               break;
                           case 2:
-                              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::settings.rumbleIntensity / 3); // (peak to falling,)
+                              analogWrite(SamcoPreferences::pins.oRumble, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleIntensity / 3); // (peak to falling,)
                               serialRumbPulseStage = 0;
                               serialRumbPulsesLast++;
                               serialRumbPulsesLastUpdate = millis();
@@ -3912,12 +4127,12 @@ void TriggerFireSimple()
     if(!buttonPressed &&                             // Have we not fired the last cycle,
     offscreenButtonSerial && buttons.offScreen) {    // and are pointing the gun off screen WITH the offScreen button mode set?    
         if(buttons.analogOutput) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3); } 
-	      else { AbsMouse5.press(MOUSE_RIGHT); } 
+          else { AbsMouse5.press(MOUSE_RIGHT); } 
         offscreenBShot = true;                       // Mark we pressed the right button via offscreen shot mode,
         buttonPressed = true;                        // Mark so we're not spamming these press events.
     } else if(!buttonPressed) {                      // Else, have we simply not fired the last cycle?
-	      if(buttons.analogOutput) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
-	      else { AbsMouse5.press(MOUSE_LEFT); }
+          if(buttons.analogOutput) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
+          else { AbsMouse5.press(MOUSE_LEFT); }
         buttonPressed = true;                        // Set this so we won't spam a repeat press event again.
     }
 }
@@ -3928,11 +4143,11 @@ void TriggerNotFireSimple()
     if(buttonPressed) {                              // Just to make sure we aren't spamming mouse button events.
         if(offscreenBShot) {                         // if it was marked as an offscreen button shot,
             if(buttons.analogOutput) { Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3); }
-	          else { AbsMouse5.release(MOUSE_RIGHT); }
+              else { AbsMouse5.release(MOUSE_RIGHT); }
             offscreenBShot = false;                  // And set it off.
         } else {                                     // Else,
             if(buttons.analogOutput) { Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
-	          else { AbsMouse5.release(MOUSE_LEFT); }
+              else { AbsMouse5.release(MOUSE_LEFT); }
         }
         buttonPressed = false;                       // Unset the button pressed bit.
     }
@@ -4357,7 +4572,7 @@ void PrintExtras()
     }
     #ifdef USES_RUMBLE
         Serial.print("Rumble enabled: ");
-        if(SamcoPreferences::toggles.rumbleActive) {
+        if(SamcoPreferences::GetRumbleActive()) {
             Serial.println("True");
         } else {
             Serial.println("False");
@@ -4365,10 +4580,10 @@ void PrintExtras()
     #endif // USES_RUMBLE
     #ifdef USES_SOLENOID
         Serial.print("Solenoid enabled: ");
-        if(SamcoPreferences::toggles.solenoidActive) {
+        if(SamcoPreferences::GetSolenoidActive()) {
             Serial.println("True");
             Serial.print("Rapid fire enabled: ");
-            if(SamcoPreferences::toggles.autofireActive) {
+            if(SamcoPreferences::GetAutofireActive()) {
                 Serial.println("True");
             } else {
                 Serial.println("False");
@@ -4402,13 +4617,13 @@ void LoadPreferences()
     if(!nvAvailable) {
         return;
     }
-
-#ifdef SAMCO_FLASH_ENABLE
-    nvPrefsError = SamcoPreferences::Load(flash);
-#else
+    Serial.println("Debug : LoadPref1");
     nvPrefsError = SamcoPreferences::LoadProfiles();
-#endif // SAMCO_FLASH_ENABLE
+    
+    //nvPrefsError = SamcoPreferences::Error_NoStorage;
+    Serial.println("Debug : LoadPref2");
     VerifyPreferences();
+    Serial.println("Debug : LoadPref3");
 }
 
 // Profile sanity checks
@@ -4471,12 +4686,7 @@ void SavePreferences()
         #endif // USES_DISPLAY
         Serial.print("Settings saved to ");
         Serial.println(NVRAMlabel);
-        SamcoPreferences::SaveToggles();
-        if(SamcoPreferences::toggles.customPinsInUse) {
-            SamcoPreferences::SavePins();
-        }
-        SamcoPreferences::SaveSettings();
-        SamcoPreferences::SaveUSBID();
+        
         #ifdef LED_ENABLE
             for(byte i = 0; i < 3; i++) {
                 LedUpdate(25,25,255);
@@ -4882,23 +5092,23 @@ void AutofireSpeedToggle(byte setting)
 {
     // If a number is passed, assume this is from Serial and directly set it.
     if(setting >= 2 && setting <= 4) {
-        SamcoPreferences::settings.autofireWaitFactor = setting;
+        SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor = setting;
         Serial.print("Autofire speed level ");
         Serial.println(setting);
         return;
     // Else, this is a button toggle, so cycle.
     } else {
-        switch (SamcoPreferences::settings.autofireWaitFactor) {
+        switch (SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor) {
             case 2:
-                SamcoPreferences::settings.autofireWaitFactor = 3;
+                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor = 3;
                 Serial.println("Autofire speed level 2.");
                 break;
             case 3:
-                SamcoPreferences::settings.autofireWaitFactor = 4;
+                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor = 4;
                 Serial.println("Autofire speed level 3.");
                 break;
             case 4:
-                SamcoPreferences::settings.autofireWaitFactor = 2;
+                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor = 2;
                 Serial.println("Autofire speed level 1.");
                 break;
         }
@@ -4908,9 +5118,9 @@ void AutofireSpeedToggle(byte setting)
         #ifdef USES_SOLENOID
             for(byte i = 0; i < 5; i++) {                             // And demonstrate the new autofire factor five times!
                 digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);
-                delay(SamcoPreferences::settings.solenoidFastInterval);
+                delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval);
                 digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
-                delay(SamcoPreferences::settings.solenoidFastInterval * SamcoPreferences::settings.autofireWaitFactor);
+                delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor);
             }
         #endif // USES_SOLENOID
         #ifdef LED_ENABLE
@@ -4933,9 +5143,9 @@ void BurstFireToggle()
         #ifdef USES_SOLENOID
             for(byte i = 0; i < 4; i++) {
                 digitalWrite(solenoidPin, HIGH);                  // Demonstrate it by flicking the solenoid on/off three times!
-                delay(SamcoPreferences::settings.solenoidFastInterval);                      // (at a fixed rate to distinguish it from autofire speed toggles)
+                delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval);                      // (at a fixed rate to distinguish it from autofire speed toggles)
                 digitalWrite(solenoidPin, LOW);
-                delay(SamcoPreferences::settings.solenoidFastInterval * 2);
+                delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * 2);
             }
         #endif // USES_SOLENOID
         #ifdef LED_ENABLE
@@ -4965,8 +5175,8 @@ void BurstFireToggle()
 // Does a cute rumble pattern when on, or blinks LEDs (if any)
 void RumbleToggle()
 {
-    SamcoPreferences::toggles.rumbleActive = !SamcoPreferences::toggles.rumbleActive;
-    if(SamcoPreferences::toggles.rumbleActive) {
+    SamcoPreferences::SetRumbleActive(!SamcoPreferences::GetRumbleActive());
+    if(SamcoPreferences::GetRumbleActive()) {
         if(!serialMode) { Serial.println("Rumble enabled!"); }
         #ifdef USES_DISPLAY
             OLED.TopPanelUpdate("Toggli", "ng Rumble ON");
@@ -5008,8 +5218,8 @@ void RumbleToggle()
 // Does a cute solenoid engagement, or blinks LEDs (if any)
 void SolenoidToggle()
 {
-    SamcoPreferences::toggles.solenoidActive = !SamcoPreferences::toggles.solenoidActive;                             // Toggle
-    if(SamcoPreferences::toggles.solenoidActive) {                                          // If we turned ON this mode,
+    SamcoPreferences::SetSolenoidActive(!SamcoPreferences::GetSolenoidActive());                             // Toggle
+    if(SamcoPreferences::GetSolenoidActive()) {                                          // If we turned ON this mode,
         if(!serialMode) { Serial.println("Solenoid enabled!"); }
         #ifdef USES_DISPLAY
             OLED.TopPanelUpdate("Toggli", "ng Solenoid ON");

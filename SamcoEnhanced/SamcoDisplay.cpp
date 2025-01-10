@@ -37,16 +37,16 @@ ExtDisplay::ExtDisplay() {}
 
 void ExtDisplay::Display()
 {
-	#ifdef USES_NUNCHUCK
+    #ifdef USES_NUNCHUCK
     nunchuckActif = false; 
     display->display();
     unsigned long now = millis();
     if(nextStepNunchuck < now + 10) nextStepNunchuck = now + 10;
     nunchuckStepWrite = true;
     nunchuckActif = true;
-	#else
-	display->display();
-	#endif
+    #else
+    display->display();
+    #endif
 }
 
 bool ExtDisplay::Begin()

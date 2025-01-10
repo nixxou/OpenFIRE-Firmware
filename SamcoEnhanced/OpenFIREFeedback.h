@@ -88,7 +88,7 @@ private:
     unsigned int temperatureGraph[4];          // Table of collected (converted) TMP36 readings, to be averaged into temperatureCurrent on the fourth value.
     uint8_t temperatureIndex = 0;              // Current index of temperatureGraph to update; initiates temperatureCurrent update/averaging when = 3.
 
-    const unsigned int solenoidWarningInterval = SamcoPreferences::settings.solenoidFastInterval * 5; // for if solenoid is getting toasty.
+    //const unsigned int solenoidWarningInterval = SamcoPreferences::settings.solenoidFastInterval * 5; // for if solenoid is getting toasty.
 
     // For burst firing stuff:
     byte burstFireCount = 0;                   // What shot are we on?

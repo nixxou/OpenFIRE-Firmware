@@ -17,6 +17,11 @@
 #include <OpenFIREBoard.h>
 #include <stdint.h>
 
+
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+    #include <ArduinoJson.h>
+#endif
+
 /// @brief Static instance of preferences to save in non-volatile memory
 class SamcoPreferences
 {
@@ -30,6 +35,106 @@ public:
         Error_Write = -4,
         Error_Erase = -5
     };
+    
+    typedef struct TemporarySerialSettings_s {
+        int rumbleActive = -1;
+        int solenoidActive = -1;
+        int autofireActive = -1;    
+        int rumbleFF = -1;
+    } __attribute__ ((packed)) TemporarySerialSettings_t;
+    
+    static TemporarySerialSettings_t temporarySerialSettings;
+
+    /*
+    static bool GetRumbleActive(){ return SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive; };    
+    static bool GetSolenoidActive(){ return SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive; };
+    static bool GetAutofireActive(){ return SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive; };
+    static bool GetRumbleFF() {return SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF; };
+
+    static void SetRumbleActive(bool value, bool temporary = false) {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive = value;
+            SamcoPreferences::temporarySerialSettings.rumbleActive = -1;
+    }
+    static void SetSolenoidActive(bool value, bool temporary = false) {
+
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive = value;
+            SamcoPreferences::temporarySerialSettings.solenoidActive = -1;
+    }
+    static void SetAutofireActive(bool value, bool temporary = false) {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive = value;
+            SamcoPreferences::temporarySerialSettings.autofireActive = -1;
+    }
+    static void SetRumbleFF(bool value, bool temporary = false) {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF = value;
+            SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
+    }        
+    */
+            
+    
+    static bool GetRumbleActive(){ return SamcoPreferences::temporarySerialSettings.rumbleActive != -1 ? SamcoPreferences::temporarySerialSettings.rumbleActive : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive; };    
+    static bool GetSolenoidActive(){ return SamcoPreferences::temporarySerialSettings.solenoidActive != -1 ? SamcoPreferences::temporarySerialSettings.solenoidActive : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive; };
+    static bool GetAutofireActive(){ return SamcoPreferences::temporarySerialSettings.autofireActive != -1 ? SamcoPreferences::temporarySerialSettings.autofireActive : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive; };
+    static bool GetRumbleFF() {return SamcoPreferences::temporarySerialSettings.rumbleFF != -1 ? SamcoPreferences::temporarySerialSettings.rumbleFF : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF; };
+        
+        
+    static void SetRumbleActive(bool value, bool temporary = false) {
+        if (temporary) {
+            SamcoPreferences::temporarySerialSettings.rumbleActive = value;
+        } else {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive = value;
+            SamcoPreferences::temporarySerialSettings.rumbleActive = -1;
+        }
+        
+    }
+    static void SetSolenoidActive(bool value, bool temporary = false) {
+        
+        if (temporary) {
+            SamcoPreferences::temporarySerialSettings.solenoidActive = value;
+        } else {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive = value;
+            SamcoPreferences::temporarySerialSettings.solenoidActive = -1;
+        }
+        
+    }
+    static void SetAutofireActive(bool value, bool temporary = false) {
+        
+        if (temporary) {
+            SamcoPreferences::temporarySerialSettings.autofireActive = value;
+        } else {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive = value;
+            SamcoPreferences::temporarySerialSettings.autofireActive = -1;
+        }
+        
+    }
+    static void SetRumbleFF(bool value, bool temporary = false) {
+        
+        if (temporary) {
+            SamcoPreferences::temporarySerialSettings.rumbleFF = value;
+        } else {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF = value;
+            SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
+        }
+        
+    }
+    
+      
+    //Used when pins are not set
+    static void DisableRumbleActive(){
+        for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].rumbleActive = false;}
+        SamcoPreferences::temporarySerialSettings.rumbleActive = -1;
+    }
+    static void DisableSolenoidActive(){
+        for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].solenoidActive = false;}
+        SamcoPreferences::temporarySerialSettings.solenoidActive = -1;
+    }
+    static void DisableAutofireActive(){
+        for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].autofireActive = false;}
+        SamcoPreferences::temporarySerialSettings.autofireActive = -1;
+    }    
+    static void DisableRumbleFF(){
+        for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].rumbleFF = false;}
+        SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
+    }        
     
     /// @brief Header ID
     typedef union HeaderId_u {
@@ -52,14 +157,31 @@ public:
         uint32_t buttonMask : 16;   // Button mask assigned to this profile
         bool irLayout;              // square or diamond IR for this display?
         uint32_t color   : 24;      // packed color blob per profile
-        char name[16];               // Profile display name
+
+        
+        uint8_t rumbleIntensity = 255;
+        uint16_t rumbleInterval = 150;
+        uint16_t solenoidNormalInterval = 45;
+        uint16_t solenoidFastInterval = 30;
+        uint16_t solenoidLongInterval = 500;
+        uint8_t autofireWaitFactor = 3;
+        uint32_t customLEDcolor1 = 0xFF0000;
+        uint32_t customLEDcolor2 = 0x00FF00;
+        uint32_t customLEDcolor3 = 0x0000FF;
+        bool rumbleActive = true;       // Are we allowed to do rumble?
+        bool solenoidActive = true;     // Are we allowed to use a solenoid?
+        bool autofireActive = false;    // Is autofire enabled?
+        bool rumbleFF = false;          // Rumble force-feedback, instead of Solenoid    
+
+
+        char name[16];               // Profile display name        
+        
     } __attribute__ ((packed)) ProfileData_t;
 
     /// @brief Preferences that can be stored in flash
     typedef struct Preferences_s {
         // pointer to ProfileData_t array
         SamcoPreferences::ProfileData_t* pProfileData;
-        
         // number of ProfileData_t entries
         uint8_t profileCount;
 
@@ -84,17 +206,18 @@ public:
 
     typedef struct TogglesMap_s {
         bool customPinsInUse = false;   // Are we using custom pins mapping?
-        bool rumbleActive = true;       // Are we allowed to do rumble?
-        bool solenoidActive = true;     // Are we allowed to use a solenoid?
-        bool autofireActive = false;    // Is autofire enabled?
+        bool rumbleActive = true;       // DEPRECIATED, Now on the ExtraProfile.
+        bool solenoidActive = true;     // DEPRECIATED, Now on the ExtraProfile.
+        bool autofireActive = false;    // DEPRECIATED, Now on the ExtraProfile.
         bool simpleMenu = false;        // Is simple pause menu active?
         bool holdToPause = false;       // Is holding A/B buttons to enter pause mode allowed?
         bool commonAnode = true;        // If LED is Common Anode (+, connects to 5V) rather than Common Cathode (-, connects to GND)
         bool lowButtonMode = false;     // Is low buttons mode active?
-        bool rumbleFF = false;          // Rumble force-feedback, instead of Solenoid
+        bool rumbleFF = false;          // DEPRECIATED, Now on the ExtraProfile.
     } __attribute__ ((packed)) TogglesMap_t;
 
     static TogglesMap_t toggles;
+    
 
     enum InputTypes_e {
         Pin_Trigger = 0,
@@ -182,18 +305,21 @@ public:
     };
 
     typedef struct SettingsMap_s {
-        uint8_t rumbleIntensity = 255;
-        uint16_t rumbleInterval = 150;
-        uint16_t solenoidNormalInterval = 45;
-        uint16_t solenoidFastInterval = 30;
-        uint16_t solenoidLongInterval = 500;
-        uint8_t autofireWaitFactor = 3;
+        //uint8_t rumbleIntensity = 255;  // DEPRECIATED, Now on the ExtraProfile.
+        //uint16_t rumbleInterval = 150; // DEPRECIATED, Now on the ExtraProfile.
+        //uint16_t solenoidNormalInterval = 45; // DEPRECIATED, Now on the ExtraProfile.
+        //uint16_t solenoidFastInterval = 30; // DEPRECIATED, Now on the ExtraProfile.
+        //uint16_t solenoidLongInterval = 500; // DEPRECIATED, Now on the ExtraProfile.
+        //uint8_t autofireWaitFactor = 3; // DEPRECIATED, Now on the ExtraProfile.
         uint16_t pauseHoldLength = 2500;
         uint8_t customLEDcount = 1;
         uint8_t customLEDstatic = 0;
-        uint32_t customLEDcolor1 = 0xFF0000;
-        uint32_t customLEDcolor2 = 0x00FF00;
-        uint32_t customLEDcolor3 = 0x0000FF;
+        //uint32_t customLEDcolor1 = 0xFF0000; // DEPRECIATED, Now on the ExtraProfile.
+        //uint32_t customLEDcolor2 = 0x00FF00; // DEPRECIATED, Now on the ExtraProfile.
+        //uint32_t customLEDcolor3 = 0x0000FF; // DEPRECIATED, Now on the ExtraProfile.
+        int serverPort = 80;
+        char apName[50];
+        char apPassword[50];         
     } SettingsMap_t;
 
     static SettingsMap_t settings;
@@ -209,21 +335,14 @@ public:
     } USBMap_t;
 
     static USBMap_t usb;
-
-    // header ID to ensure junk isn't loaded if preferences aren't saved
-    static const HeaderId_t HeaderId;
+    
+    static String baseJson;
+    
+    static bool fsInitialized;
 
     /// @brief Required size for the preferences
     static unsigned int Size() { return sizeof(ProfileData_t) * profiles.profileCount + sizeof(HeaderId_u) + sizeof(profiles.selectedProfile); }
-
-    /// @brief Save/Update header
-    /// @return Nothing
-    static void WriteHeader();
-
-    /// @brief Load and compare the header
-    /// @return An error code from Errors_e
-    static int CheckHeader();
-
+    
     /// @brief Load preferences
     /// @return An error code from Errors_e
     static int LoadProfiles();
@@ -232,37 +351,6 @@ public:
     /// @return An error code from Errors_e
     static int SaveProfiles();
 
-    /// @brief Load toggles
-    /// @return An error code from Errors_e
-    static int LoadToggles();
-
-    /// @brief Save current toggles states
-    /// @return An error code from Errors_e
-    static int SaveToggles();
-
-    /// @brief Load pin mapping
-    /// @return An error code from Errors_e
-    static int LoadPins();
-
-    /// @brief Save current pin mapping
-    /// @return An error code from Errors_e
-    static int SavePins();
-
-    /// @brief Load settings
-    /// @return An error code from Errors_e
-    static int LoadSettings();
-
-    /// @brief Save current settings
-    /// @return An error code from Errors_e
-    static int SaveSettings();
-
-    /// @brief Load USB identifier info
-    /// @return An error code from Errors_e
-    static int LoadUSBID();
-
-    /// @brief Save current USB ID
-    /// @return An error code from Errors_e
-    static int SaveUSBID();
 
     /// @brief Resets preferences with a zero-fill to the EEPROM.
     /// @return Nothing
@@ -275,6 +363,13 @@ public:
     /// @brief Sets pre-set camera pins according to the board
     /// @return Nothing
     static void PresetCam();
+    #if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+    
+    static String structuresToJson();
+    
+    static bool JsonToStructures(const String& jsonString);
+    
+    #endif
 };
 
 #endif // _SAMCOPREFERENCES_H_

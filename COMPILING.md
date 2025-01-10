@@ -37,7 +37,7 @@ Compiling from the cli is necessary for build flags to apply to the whole projec
     ```
  6. Build OpenFIRE Firmware (replacing `{BOARD}` with your desired microcontroller's fqbn name:
     ```bash
-    $ arduino-cli compile -e --fqbn rp2040:rp2040:{BOARD}:usbstack=tinyusb,opt=Optimize3 /path/to/OpenFIRE-Firmware/SamcoEnhanced --libraries /path/to/repo/libraries --build-property "build.extra_flags=-DUSES_DISPLAY=1 -DPLAYER_NUMBER=1 -DUSES_SOLENOID=1 -DUSES_RUMBLE=1 -DUSES_SWITCHES=1 -DMAMEHOOKER=1 -DUSES_ANALOG=1 -DCUSTOM_NEOPIXEL=1 -DFOURPIN_LED=1 -DDUAL_CORE=1"
+    $ arduino-cli compile -e --fqbn rp2040:rp2040:{BOARD}:flash=2097152_65536,usbstack=tinyusb,opt=Optimize3 /path/to/OpenFIRE-Firmware/SamcoEnhanced --libraries /path/to/repo/libraries --build-property "build.extra_flags=-DUSES_DISPLAY=1 -DPLAYER_NUMBER=1 -DUSES_SOLENOID=1 -DUSES_RUMBLE=1 -DUSES_SWITCHES=1 -DMAMEHOOKER=1 -DUSES_ANALOG=1 -DCUSTOM_NEOPIXEL=1 -DFOURPIN_LED=1 -DDUAL_CORE=1 -DUSES_NUNCHUCK=1 -DUSES_WEBSERVER=1"
     ```
     *for custom builds, feel free to configure the above build flags to your needs to enable/disable certain OpenFIREfw features.*
     
