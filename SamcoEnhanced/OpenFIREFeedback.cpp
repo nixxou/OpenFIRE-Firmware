@@ -56,7 +56,7 @@ void FFB::FFBOnScreen()
             if(digitalRead(SamcoPreferences::pins.oSolenoid)) {              // If so, are we still engaged? We need to let it go normally, but maintain the single shot flag.
                 currentMillis = millis();
                 if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval) { // If we finally surpassed the wait threshold...
-                    digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);     // Let it go.
+                    STOP_RECOIL();     // Let it go.
                 }
             } else {                                    // We're waiting on the extended wait before repeating in single shot mode.
                 currentMillis = millis();
@@ -99,7 +99,7 @@ void FFB::FFBOffScreen()
         currentMillis = millis();                      // Calibrate current time
         if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval) { // I guess if we're not firing, may as well use the fastest shutoff.
             previousMillisSol = currentMillis;
-            digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
+            STOP_RECOIL();
         }
     }
 }
@@ -114,7 +114,7 @@ void FFB::FFBRelease()
             currentMillis = millis();
             if(currentMillis - previousMillisSol >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval) { // I guess if we're not firing, may as well use the fastest shutoff.
                 previousMillisSol = currentMillis;
-                digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);             // Make sure to turn it off.
+                STOP_RECOIL();             // Make sure to turn it off.
             }
         }
     }
@@ -140,7 +140,7 @@ void FFB::SolenoidActivation(int solenoidFinalInterval)
 {
     if(solenoidFirstShot) {                                       // If this is the first time we're shooting, it's probably safe to shoot regardless of temps.
         previousMillisSol = millis();                             // Calibrate the timer for future calcs.
-        digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);     // Since we're shooting the first time, just turn it on aaaaand fire.
+        START_RECOIL();     // Since we're shooting the first time, just turn it on aaaaand fire.
     } else {
         if(SamcoPreferences::pins.aTMP36 >= 0) { // If a temp sensor is installed and enabled,
             TemperatureUpdate();
@@ -150,31 +150,31 @@ void FFB::SolenoidActivation(int solenoidFinalInterval)
                     if(digitalRead(SamcoPreferences::pins.oSolenoid)) {    // Is the valve being pulled now?
                         if(currentMillis - previousMillisSol >= solenoidFinalInterval) {
                             previousMillisSol = currentMillis;
-                            digitalWrite(SamcoPreferences::pins.oSolenoid, !digitalRead(SamcoPreferences::pins.oSolenoid)); // Flip, flop.
+                            FLIP_RECOIL(); // Flip, flop.
                         }
                     } else { // The solenoid's probably off, not on right now. So that means we should wait a bit longer to fire again.
                         if(currentMillis - previousMillisSol >= (SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * 5)) { // We're keeping it low for a bit longer, to keep temps stable. Try to give it a bit of time to cool down before we go again.
                             previousMillisSol = currentMillis;
-                            digitalWrite(SamcoPreferences::pins.oSolenoid, !digitalRead(SamcoPreferences::pins.oSolenoid));
+                            FLIP_RECOIL();
                         }
                     }
                 } else {
                     if(currentMillis - previousMillisSol >= solenoidFinalInterval) {
                         previousMillisSol = currentMillis;
-                        digitalWrite(SamcoPreferences::pins.oSolenoid, !digitalRead(SamcoPreferences::pins.oSolenoid)); // run the solenoid into the state we've just inverted it to.
+                        FLIP_RECOIL(); // run the solenoid into the state we've just inverted it to.
                     }
                 }
             } else {
                 #ifdef PRINT_VERBOSE
                     Serial.println("Solenoid over safety threshold; not activating!");
                 #endif
-                digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);                       // Make sure it's off if we're this dangerously close to the sun.
+                STOP_RECOIL();                       // Make sure it's off if we're this dangerously close to the sun.
             }
         } else { // No temp sensor, so just go ahead.
             currentMillis = millis();
             if(currentMillis - previousMillisSol >= solenoidFinalInterval) { // If we've waited long enough for this interval,
                 previousMillisSol = currentMillis;                    // Since we've waited long enough, calibrate the timer
-                digitalWrite(SamcoPreferences::pins.oSolenoid, !digitalRead(SamcoPreferences::pins.oSolenoid)); // run the solenoid into the state we've just inverted it to.
+                FLIP_RECOIL(); // run the solenoid into the state we've just inverted it to.
             }
         }
     }
@@ -267,7 +267,7 @@ void FFB::BurstFire()
 
 void FFB::FFBShutdown()
 {
-    digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
+    STOP_RECOIL();
     digitalWrite(SamcoPreferences::pins.oRumble, LOW);
     solenoidFirstShot = false;
     rumbleHappening = false;

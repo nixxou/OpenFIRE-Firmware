@@ -116,7 +116,6 @@ public:
         }
         
     }
-    
       
     //Used when pins are not set
     static void DisableRumbleActive(){
@@ -168,6 +167,11 @@ public:
         uint32_t customLEDcolor1 = 0xFF0000;
         uint32_t customLEDcolor2 = 0x00FF00;
         uint32_t customLEDcolor3 = 0x0000FF;
+        
+        uint8_t ledPWM1Level = 7;
+        uint8_t ledPWM2Level = 7;
+        uint16_t ledPWMRecoilFadeDuration = 400;
+        
         bool rumbleActive = true;       // Are we allowed to do rumble?
         bool solenoidActive = true;     // Are we allowed to use a solenoid?
         bool autofireActive = false;    // Is autofire enabled?
@@ -250,7 +254,10 @@ public:
         Pin_Battery,
         Pin_AnalogX,
         Pin_AnalogY,
-        Pin_AnalogTMP
+        Pin_AnalogTMP,
+        Pin_LedPWMControl1,
+        Pin_LedPWMControl2,
+        Pin_LedPWMControlRecoil
     };
 
     typedef struct PinsMap_s {
@@ -285,6 +292,9 @@ public:
         int8_t aStickX = -1;               // Analog Stick X-axis
         int8_t aStickY = -1;               // Analog Stick Y-axis
         int8_t aTMP36 = -1;                // Analog TMP36 Temperature Sensor Pin
+        int8_t oLedPWMControl1 = -1;       // PWM Led driver control 1
+        int8_t oLedPWMControl2 = -1;    // PWM Led driver control 2
+        int8_t oLedPWMControlRecoil = -1;//PWM Led driver control on Recoil 
     } PinsMap_t;
 
     static PinsMap_t pins;
@@ -317,6 +327,14 @@ public:
         //uint32_t customLEDcolor1 = 0xFF0000; // DEPRECIATED, Now on the ExtraProfile.
         //uint32_t customLEDcolor2 = 0x00FF00; // DEPRECIATED, Now on the ExtraProfile.
         //uint32_t customLEDcolor3 = 0x0000FF; // DEPRECIATED, Now on the ExtraProfile.
+        
+        uint8_t ledPWM1_min = 0;
+        uint8_t ledPWM1_max = 0;
+        uint8_t ledPWM2_min = 0;
+        uint8_t ledPWM2_max = 0;
+        uint8_t ledPWMRecoil_min = 0;
+        uint8_t ledPWMRecoil_max = 0;
+        
         int serverPort = 80;
         char apName[50];
         char apPassword[50];         

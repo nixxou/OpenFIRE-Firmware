@@ -24,7 +24,10 @@
 #include <RP2040.h>
 #include <OpenFIREBoard.h>
 #include <Arduino.h>
+#include "SamcoPWMLed.h"
 //#include <LittleFS.h>
+
+
 
 #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
     #include <WiFi.h>
@@ -330,10 +333,10 @@ enum RunMode_e {
 // defaults can be populated here, but any values in EEPROM/Flash will override these.
 // top/bottom/left/right offsets, TLled/TRled, adjX/adjY, sensitivity, runmode, button mask mapped to profile, layout toggle, color, name
 SamcoPreferences::ProfileData_t profileData[ProfileCount] = {
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_A,      false, 0xFF0000, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile A"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_B,      false, 0x00FF00, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile B"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Start,  false, 0x0000FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile Start"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Select, false, 0xFF00FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, true, true, false, false, "Profile Select"}
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_A,      false, 0xFF0000, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile A"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_B,      false, 0x00FF00, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile B"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Start,  false, 0x0000FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile Start"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Select, false, 0xFF00FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile Select"}
 };
 
 
@@ -352,6 +355,7 @@ bool buttonPressed = false;                      // Sanity check.
 
 #ifdef USES_ANALOG
     bool analogIsValid;                          // Flag set true if analog stick is mapped to valid nums
+    unsigned long lastAnalogPoll = millis();
 #endif // USES_ANALOG
 
 #ifdef FOURPIN_LED
@@ -1130,9 +1134,6 @@ void loop1()
     #endif        
     
     
-    #ifdef USES_ANALOG
-        unsigned long lastAnalogPoll = millis();
-    #endif // USES_ANALOG
     if(gunMode == GunMode_Run) {
         // For processing the trigger specifically.
         // (buttons.debounced is a binary variable intended to be read 1 bit at a time, with the 0'th point == rightmost == decimal 1 == trigger, 3 = start, 4 = select)
@@ -1286,12 +1287,13 @@ void loop1()
                 // at this point, the other core should be stopping us now.
             }
         }
-        #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
-        checkWiFiConnection();
-        #endif
     }
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
     checkWiFiConnection();
+    #endif
+    
+    #ifdef USES_PWMLED
+    SamcoPWMLed::UpdateRecoilLed();
     #endif
 }
 #endif // ARDUINO_ARCH_RP2040 || DUAL_CORE
@@ -3360,9 +3362,9 @@ void SerialProcessingDocked()
                 switch(serialInput) {
                     #ifdef USES_SOLENOID
                     case 's':
-                      digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);
+                      START_RECOIL();
                       delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval);
-                      digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
+                      STOP_RECOIL();
                       break;
                     #endif // USES_SOLENOID
                     #ifdef USES_RUMBLE
@@ -3673,7 +3675,7 @@ void SerialProcessing()
                       serialRumbPulsesLast = 0;
                   #endif // USES_RUMBLE
                   #ifdef USES_SOLENOID
-                      digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
+                      STOP_RECOIL();
                       serialSolPulses = 0;
                       serialSolPulsesLast = 0;
                   #endif // USES_SOLENOID
@@ -3962,34 +3964,34 @@ void SerialHandling()
     #ifdef USES_SOLENOID
       if(SamcoPreferences::GetSolenoidActive()) {
           if(bitRead(serialQueue, SerialQueue_Solenoid)) {          // If the solenoid digital bit is on,
-              digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);      // Make it go!
+              START_RECOIL();      // Make it go!
           } else if(bitRead(serialQueue, SerialQueue_SolPulse)) {   // if the solenoid pulse bit is on,
               if(!serialSolPulsesLast) {                            // Have we started pulsing?
-                  digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);  // Start pulsing it on!
+                  START_RECOIL();  // Start pulsing it on!
                   serialSolPulsesLast = 1;                               // Start the sequence.
                   serialSolPulses++;                                     // Cheating and scooting the pulses bit up.
               } else if(serialSolPulsesLast <= serialSolPulses) {   // Have we met the pulses quota?
                   if(digitalRead(SamcoPreferences::pins.oSolenoid)) {
                       if(millis() - serialSolPulsesLastUpdate >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidNormalInterval) {
-                          digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);  // Start pulsing it off.
+                          STOP_RECOIL();  // Start pulsing it off.
                           serialSolPulsesLast++;                         // Iterate that we've done a pulse cycle,
                           serialSolPulsesLastUpdate = millis();          // Timestamp our last pulse event.
                       }
                   } else {
                       if(millis() - serialSolPulsesLastUpdate >= SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor) {
-                          digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH); // Start pulsing it on.
+                          START_RECOIL(); // Start pulsing it on.
                           serialSolPulsesLastUpdate = millis();          // Timestamp our last pulse event.
                       }
                   }
               } else { // finished pulsing
-                  digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);   // Finally shut it off for good.
+                  STOP_RECOIL();   // Finally shut it off for good.
                   bitClear(serialQueue, SerialQueue_SolPulse);           // Set the pulse bit as off.
               }
           } else {  // or if it's not,
-              digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);       // turn it off!
+              STOP_RECOIL();       // turn it off!
           }
       } else {
-          digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
+          STOP_RECOIL();
       }
   #endif // USES_SOLENOID
   #ifdef USES_RUMBLE
@@ -4828,6 +4830,12 @@ bool SelectCalProfile(unsigned int profile)
     #ifdef LED_ENABLE
         SetLedColorFromMode();
     #endif // LED_ENABLE
+    
+    #ifdef USES_PWMLED
+        SamcoPWMLed::SetLedPWM1Level();
+        SamcoPWMLed::SetLedPWM2Level();
+        SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoil_Inactif);
+    #endif
 
     // enable save to allow setting new default profile
     stateFlags |= StateFlag_SavePreferencesEn;
@@ -4859,6 +4867,7 @@ bool SelectCalPrefs(unsigned int profile)
     return false;
 }
 */
+
 
 #ifdef LED_ENABLE
 // initializes system and 4pin RGB LEDs.
@@ -5117,9 +5126,9 @@ void AutofireSpeedToggle(byte setting)
         #endif // LED_ENABLE
         #ifdef USES_SOLENOID
             for(byte i = 0; i < 5; i++) {                             // And demonstrate the new autofire factor five times!
-                digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);
+                START_RECOIL();
                 delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval);
-                digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);
+                STOP_RECOIL();
                 delay(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidFastInterval * SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireWaitFactor);
             }
         #endif // USES_SOLENOID
@@ -5227,9 +5236,9 @@ void SolenoidToggle()
         #ifdef LED_ENABLE
             SetLedPackedColor(WikiColor::Yellow);                 // Set a color,
         #endif // LED_ENABLE
-        digitalWrite(SamcoPreferences::pins.oSolenoid, HIGH);                          // Engage the solenoid on to notify the user,
+        START_RECOIL();                          // Engage the solenoid on to notify the user,
         delay(300);                                               // Hold it that way for a bit,
-        digitalWrite(SamcoPreferences::pins.oSolenoid, LOW);                           // Release it,
+        STOP_RECOIL();                           // Release it,
         #ifdef LED_ENABLE
             SetLedPackedColor(profileData[selectedProfile].color);    // And reset the LED back to pause mode color
         #endif // LED_ENABLE

@@ -419,7 +419,11 @@ String  SamcoPreferences::structuresToJson() {
         while (hexColor.length() < 6) {
             hexColor = "0" + hexColor;
         }
-        profileJson["customLEDcolor3"] = "#" + hexColor;        
+        profileJson["customLEDcolor3"] = "#" + hexColor;
+
+        profileJson["ledPWM1Level"] = profile.ledPWM1Level;
+        profileJson["ledPWM2Level"] = profile.ledPWM2Level;
+        profileJson["ledPWMRecoilFadeDuration"] = profile.ledPWMRecoilFadeDuration;
         
         profileJson["rumbleActive"] = profile.rumbleActive;
         profileJson["solenoidActive"] = profile.solenoidActive;
@@ -471,12 +475,23 @@ String  SamcoPreferences::structuresToJson() {
     pinsJson["aStickX"] = SamcoPreferences::pins.aStickX;
     pinsJson["aStickY"] = SamcoPreferences::pins.aStickY;
     pinsJson["aTMP36"] = SamcoPreferences::pins.aTMP36;
+    pinsJson["oLedPWMControl1"] = SamcoPreferences::pins.oLedPWMControl1;
+    pinsJson["oLedPWMControl2"] = SamcoPreferences::pins.oLedPWMControl2;
+    pinsJson["oLedPWMControlRecoil"] = SamcoPreferences::pins.oLedPWMControlRecoil;
+
 
     // Ajouter les valeurs de la structure SettingsMap_t
     JsonObject settingsJson = doc.createNestedObject("settings");
     settingsJson["pauseHoldLength"] = SamcoPreferences::settings.pauseHoldLength;
     settingsJson["customLEDcount"] = SamcoPreferences::settings.customLEDcount;
     settingsJson["customLEDstatic"] = SamcoPreferences::settings.customLEDstatic;
+    
+    settingsJson["ledPWM1_min"] = SamcoPreferences::settings.ledPWM1_min;
+    settingsJson["ledPWM1_max"] = SamcoPreferences::settings.ledPWM1_max;
+    settingsJson["ledPWM2_min"] = SamcoPreferences::settings.ledPWM2_min;
+    settingsJson["ledPWM2_max"] = SamcoPreferences::settings.ledPWM2_max;
+    settingsJson["ledPWMRecoil_min"] = SamcoPreferences::settings.ledPWMRecoil_min;
+    settingsJson["ledPWMRecoil_max"] = SamcoPreferences::settings.ledPWMRecoil_max;
 
     settingsJson["apName"] = SamcoPreferences::settings.apName;
     settingsJson["apPassword"] = SamcoPreferences::settings.apPassword;
@@ -579,7 +594,9 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
                 }
             }            
             
-            
+            if (profileJson.containsKey("ledPWM1Level")) profile.ledPWM1Level = profileJson["ledPWM1Level"];
+            if (profileJson.containsKey("ledPWM2Level")) profile.ledPWM2Level = profileJson["ledPWM2Level"];
+            if (profileJson.containsKey("ledPWMRecoilFadeDuration")) profile.ledPWMRecoilFadeDuration = profileJson["ledPWMRecoilFadeDuration"];
             
             if (profileJson.containsKey("rumbleActive")) profile.rumbleActive = profileJson["rumbleActive"];
             if (profileJson.containsKey("solenoidActive")) profile.solenoidActive = profileJson["solenoidActive"];
@@ -641,12 +658,26 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
         if (pinsJson.containsKey("aStickX")) SamcoPreferences::pins.aStickX = pinsJson["aStickX"];
         if (pinsJson.containsKey("aStickY")) SamcoPreferences::pins.aStickY = pinsJson["aStickY"];
         if (pinsJson.containsKey("aTMP36")) SamcoPreferences::pins.aTMP36 = pinsJson["aTMP36"];
+        if (pinsJson.containsKey("oLedPWMControl1")) SamcoPreferences::pins.oLedPWMControl1 = pinsJson["oLedPWMControl1"];
+        if (pinsJson.containsKey("oLedPWMControl2")) SamcoPreferences::pins.oLedPWMControl2 = pinsJson["oLedPWMControl2"];
+        if (pinsJson.containsKey("oLedPWMControlRecoil")) SamcoPreferences::pins.oLedPWMControlRecoil = pinsJson["oLedPWMControlRecoil"];        
+        
     }
 
     // Structure SettingsMap_t
     JsonObject settingsJson = doc["settings"];
     if (!settingsJson.isNull()) {
         if (settingsJson.containsKey("pauseHoldLength")) SamcoPreferences::settings.pauseHoldLength = settingsJson["pauseHoldLength"];
+        if (settingsJson.containsKey("customLEDcount")) SamcoPreferences::settings.customLEDcount = settingsJson["customLEDcount"];
+        if (settingsJson.containsKey("customLEDstatic")) SamcoPreferences::settings.customLEDstatic = settingsJson["customLEDstatic"];
+        
+        if (settingsJson.containsKey("ledPWM1_min")) SamcoPreferences::settings.ledPWM1_min = settingsJson["ledPWM1_min"];
+        if (settingsJson.containsKey("ledPWM1_max")) SamcoPreferences::settings.ledPWM1_max = settingsJson["ledPWM1_max"];
+        if (settingsJson.containsKey("ledPWM2_min")) SamcoPreferences::settings.ledPWM2_min = settingsJson["ledPWM2_min"];
+        if (settingsJson.containsKey("ledPWM2_max")) SamcoPreferences::settings.ledPWM2_max = settingsJson["ledPWM2_max"];
+        if (settingsJson.containsKey("ledPWMRecoil_min")) SamcoPreferences::settings.ledPWM1_min = settingsJson["ledPWMRecoil_min"];
+        if (settingsJson.containsKey("ledPWMRecoil_max")) SamcoPreferences::settings.ledPWM1_max = settingsJson["ledPWMRecoil_max"];
+        
         if (settingsJson.containsKey("apName")) {
             strncpy(SamcoPreferences::settings.apName, settingsJson["apName"].as<const char*>(), sizeof(SamcoPreferences::settings.apName) - 1);
             SamcoPreferences::settings.apName[sizeof(SamcoPreferences::settings.apName) - 1] = '\0';

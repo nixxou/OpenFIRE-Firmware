@@ -37,8 +37,8 @@ public:
     /// @brief Constructor
     ExtDisplay();
 
-	void Display();
-	
+    void Display();
+    
     /// @brief Attempt to start display using current pin numbers from SamcoPreferences
     /// @return success (true) or fail (false)
     bool Begin();
@@ -122,8 +122,8 @@ public:
 
     /// @brief Which layout we use for serial mode
     uint8_t serialDisplayType = 0;
-	
-	bool displayValid = false;
+    
+    bool displayValid = false;
 
 private:
 

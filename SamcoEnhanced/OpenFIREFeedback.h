@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include "SamcoPreferences.h"
+#include "SamcoPWMLed.h"
 
 class FFB {
 public:
