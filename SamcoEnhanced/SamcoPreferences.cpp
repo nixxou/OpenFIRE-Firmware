@@ -16,6 +16,7 @@
 #include <LittleFS.h>
 
 
+
 // 4 byte header ID
 /*
  * The latter two characters of the header correlate to the Save Table Version (see SamcoPreferences.h).
@@ -425,6 +426,8 @@ String  SamcoPreferences::structuresToJson() {
         profileJson["ledPWM2Level"] = profile.ledPWM2Level;
         profileJson["ledPWMRecoilFadeDuration"] = profile.ledPWMRecoilFadeDuration;
         
+        profileJson["controlMode"] = profile.controlMode;
+        
         profileJson["rumbleActive"] = profile.rumbleActive;
         profileJson["solenoidActive"] = profile.solenoidActive;
         profileJson["autofireActive"] = profile.autofireActive;
@@ -597,6 +600,8 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
             if (profileJson.containsKey("ledPWM1Level")) profile.ledPWM1Level = profileJson["ledPWM1Level"];
             if (profileJson.containsKey("ledPWM2Level")) profile.ledPWM2Level = profileJson["ledPWM2Level"];
             if (profileJson.containsKey("ledPWMRecoilFadeDuration")) profile.ledPWMRecoilFadeDuration = profileJson["ledPWMRecoilFadeDuration"];
+            
+            if (profileJson.containsKey("controlMode")) profile.controlMode = profileJson["controlMode"];    
             
             if (profileJson.containsKey("rumbleActive")) profile.rumbleActive = profileJson["rumbleActive"];
             if (profileJson.containsKey("solenoidActive")) profile.solenoidActive = profileJson["solenoidActive"];

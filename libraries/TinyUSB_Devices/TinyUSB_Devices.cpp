@@ -78,62 +78,62 @@ TinyUSBDevices_ TinyUSBDevices;
 
 #if defined(_USING_HID)
 static const uint8_t HID_REPORT_DESCRIPTOR5[] PROGMEM = {
-	0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
-	0x09, 0x02,        // Usage (Mouse)
-	0xA1, 0x01,        // Collection (Application)
-	0x09, 0x01,        //   Usage (Pointer)
-	0xA1, 0x00,        //   Collection (Physical)
-	0x85, 0x01,        //     Report ID (1)
-	0x05, 0x09,        //     Usage Page (Button)
-	0x19, 0x01,        //     Usage Minimum (0x01)
-	0x29, 0x05,        //     Usage Maximum (0x05)
-	0x15, 0x00,        //     Logical Minimum (0)
-	0x25, 0x01,        //     Logical Maximum (1)
-	0x95, 0x05,        //     Report Count (5)
-	0x75, 0x01,        //     Report Size (1)
-	0x81, 0x02,        //     Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0x95, 0x01,        //     Report Count (1)
-	0x75, 0x03,        //     Report Size (3)
-	0x81, 0x03,        //     Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0x05, 0x01,        //     Usage Page (Generic Desktop Ctrls)
-	0x09, 0x30,        //     Usage (X)
-	0x09, 0x31,        //     Usage (Y)
-	0x16, 0x00, 0x00,  //     Logical Minimum (0)
-	0x26, 0xFF, 0x7F,  //     Logical Maximum (32767)
-	0x36, 0x00, 0x00,  //     Physical Minimum (0)
-	0x46, 0xFF, 0x7F,  //     Physical Maximum (32767)
-	0x75, 0x10,        //     Report Size (16)
-	0x95, 0x02,        //     Report Count (2)
-	0x81, 0x02,        //     Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0xC0,              //   End Collection
-	0xC0               // End Collection
+    0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
+    0x09, 0x02,        // Usage (Mouse)
+    0xA1, 0x01,        // Collection (Application)
+    0x09, 0x01,        //   Usage (Pointer)
+    0xA1, 0x00,        //   Collection (Physical)
+    0x85, 0x01,        //     Report ID (1)
+    0x05, 0x09,        //     Usage Page (Button)
+    0x19, 0x01,        //     Usage Minimum (0x01)
+    0x29, 0x05,        //     Usage Maximum (0x05)
+    0x15, 0x00,        //     Logical Minimum (0)
+    0x25, 0x01,        //     Logical Maximum (1)
+    0x95, 0x05,        //     Report Count (5)
+    0x75, 0x01,        //     Report Size (1)
+    0x81, 0x02,        //     Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0x95, 0x01,        //     Report Count (1)
+    0x75, 0x03,        //     Report Size (3)
+    0x81, 0x03,        //     Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0x05, 0x01,        //     Usage Page (Generic Desktop Ctrls)
+    0x09, 0x30,        //     Usage (X)
+    0x09, 0x31,        //     Usage (Y)
+    0x16, 0x00, 0x00,  //     Logical Minimum (0)
+    0x26, 0xFF, 0x7F,  //     Logical Maximum (32767)
+    0x36, 0x00, 0x00,  //     Physical Minimum (0)
+    0x46, 0xFF, 0x7F,  //     Physical Maximum (32767)
+    0x75, 0x10,        //     Report Size (16)
+    0x95, 0x02,        //     Report Count (2)
+    0x81, 0x02,        //     Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0xC0,              //   End Collection
+    0xC0               // End Collection
 };
 #endif // _USING_HID
 
 AbsMouse5_::AbsMouse5_(uint8_t reportId) : _reportId(reportId), _buttons(0), _x(0), _y(0), _autoReport(true)
 {
 #if defined(_USING_HID)
-	static HIDSubDescriptor descriptorNode(HID_REPORT_DESCRIPTOR5, sizeof(HID_REPORT_DESCRIPTOR5));
-	HID().AppendDescriptor(&descriptorNode);
+    static HIDSubDescriptor descriptorNode(HID_REPORT_DESCRIPTOR5, sizeof(HID_REPORT_DESCRIPTOR5));
+    HID().AppendDescriptor(&descriptorNode);
 #endif // _USING_HID
 }
 
 void AbsMouse5_::init(bool autoReport)
 {
-	_autoReport = autoReport;
+    _autoReport = autoReport;
 }
 
 void AbsMouse5_::report(void)
 {
-	uint8_t buffer[5];
-	buffer[0] = _buttons;
-	buffer[1] = _x & 0xFF;
-	buffer[2] = (_x >> 8) & 0xFF;
-	buffer[3] = _y & 0xFF;
-	buffer[4] = (_y >> 8) & 0xFF;
+    uint8_t buffer[5];
+    buffer[0] = _buttons;
+    buffer[1] = _x & 0xFF;
+    buffer[2] = (_x >> 8) & 0xFF;
+    buffer[3] = _y & 0xFF;
+    buffer[4] = (_y >> 8) & 0xFF;
 
 #if defined(_USING_HID)
-	HID().SendReport(_reportId, buffer, 5);
+    HID().SendReport(_reportId, buffer, 5);
 #endif // _USING_HID
 #if defined(USE_TINYUSB)
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(ENABLE_CLASSIC)
@@ -152,31 +152,31 @@ void AbsMouse5_::report(void)
 
 void AbsMouse5_::move(uint16_t x, uint16_t y)
 {
-	if(x != _x || y != _y) {
-		_x = x;
-		_y = y;
-		if(_autoReport) {
-			report();
-		}
-	}
+    if(x != _x || y != _y) {
+        _x = x;
+        _y = y;
+        if(_autoReport) {
+            report();
+        }
+    }
 }
 
 void AbsMouse5_::press(uint8_t button)
 {
-	_buttons |= button;
+    _buttons |= button;
 
-	if(_autoReport) {
-		report();
-	}
+    if(_autoReport) {
+        report();
+    }
 }
 
 void AbsMouse5_::release(uint8_t button)
 {
-	_buttons &= ~button;
+    _buttons &= ~button;
 
-	if(_autoReport) {
-		report();
-	}
+    if(_autoReport) {
+        report();
+    }
 }
   
  /*****************************
@@ -461,7 +461,8 @@ void AbsMouse5_::release(uint8_t button)
   }
 
   void Gamepad16_::moveCam(uint16_t origX, uint16_t origY) {
-    if(stickRight) {
+    if(!SharedStaticData::loop1Started) return;
+    if(SharedStaticData::controlMode != SharedStaticData::ControlMode_e::ControlMode_GamepadCamOnRightStick) {
         gamepad16Report.X = map(origX, 0, 32767, -32767, 32767);
         gamepad16Report.Y = map(origY, 0, 32767, -32767, 32767);
     } else {
@@ -474,10 +475,11 @@ void AbsMouse5_::release(uint8_t button)
   }
 
   void Gamepad16_::moveStick(uint16_t origX, uint16_t origY) {
+    if(!SharedStaticData::loop1Started) return;
     // TODO: inverted output for Cabela's Top Shot Elite sticks, but it might be backwards for others.
     if(origX != _x || origY != _y) {
         _x = origX, _y = origY;
-        if(stickRight) {
+        if(SharedStaticData::controlMode != SharedStaticData::ControlMode_e::ControlMode_GamepadCamOnRightStick) {
             gamepad16Report.Rx = map(_x, 0, 4095, 32767, -32767);
             gamepad16Report.Ry = map(_y, 0, 4095, 32767, -32767);
         } else {
@@ -492,30 +494,47 @@ void AbsMouse5_::release(uint8_t button)
   
   #ifdef USES_NUNCHUCK
   void Gamepad16_::moveStickNunchuck(uint16_t origX, uint16_t origY) {
-	if(origX < 10 || origX > 240 || origY < 10 || origY > 240) return;  
-	  
-	if(origX < nunchuckMinX) nunchuckMinX = origX;
-	if(origX > nunchuckMaxX) nunchuckMaxX = origX;
-	if(origY < nunchuckMinY) nunchuckMinY = origY;
-	if(origY > nunchuckMaxY) nunchuckMaxY = origY;	
-	  
-	int centerX = (nunchuckMinX + nunchuckMaxX)/2.0;
-	int centerY = (nunchuckMinY + nunchuckMaxY)/2.0;
-	if(origX < centerX+2 && origX > centerX-2) origX = centerX;
-	if(origY < centerY+2 && origY > centerY-2) origY = centerY;
-	  
-	
-	//Calibration beetween nunchuck can vary slightly
-	
+    if(!SharedStaticData::loop1Started) return;
+    if(origX < 10 || origX > 240 || origY < 10 || origY > 240) return;  
+      
+    if(origX < nunchuckMinX) nunchuckMinX = origX;
+    if(origX > nunchuckMaxX) nunchuckMaxX = origX;
+    if(origY < nunchuckMinY) nunchuckMinY = origY;
+    if(origY > nunchuckMaxY) nunchuckMaxY = origY;    
+      
+    int centerX = (nunchuckMinX + nunchuckMaxX)/2.0;
+    int centerY = (nunchuckMinY + nunchuckMaxY)/2.0;
+    int deadzone = 0;
+    if(origX < centerX+4 && origX > centerX-4) deadzone++;
+    if(origY < centerY+4 && origY > centerY-4) deadzone++;
+    
+    if(deadzone==2){
+        origX = centerX;
+        origY = centerY;
+    }
+    
+    //Calibration beetween nunchuck can vary slightly
+    
     // TODO: inverted output for Cabela's Top Shot Elite sticks, but it might be backwards for others.
     if(origX != _nunchuckX || origY != _nunchuckY) {
         _nunchuckX = origX, _nunchuckY = origY;
-        if(stickRight) {
-            gamepad16Report.Rx = map(_nunchuckX, nunchuckMaxX, nunchuckMinX, 32767, -32767);
-            gamepad16Report.Ry = map(_nunchuckY, nunchuckMinY, nunchuckMaxY, 32767, -32767);
-        } else {
-            gamepad16Report.X = map(_nunchuckX, nunchuckMaxX, nunchuckMinX, 32767, -32767);
-            gamepad16Report.Y = map(_nunchuckY, nunchuckMinY, nunchuckMaxY, 32767, -32767);
+        if(deadzone==2){
+            if(SharedStaticData::controlMode != SharedStaticData::ControlMode_e::ControlMode_GamepadCamOnRightStick) {
+                gamepad16Report.Rx = map(0, 32767, -32767, 32767, -32767);
+                gamepad16Report.Ry = map(0, 32767, -32767, 32767, -32767);
+            } else {
+                gamepad16Report.X = map(0, 32767, -32767, 32767, -32767);
+                gamepad16Report.Y = map(0, 32767, -32767, 32767, -32767);
+            }
+        }
+        else{
+            if(SharedStaticData::controlMode != SharedStaticData::ControlMode_e::ControlMode_GamepadCamOnRightStick) {
+                gamepad16Report.Rx = map(_nunchuckX, nunchuckMaxX, nunchuckMinX, 32767, -32767);
+                gamepad16Report.Ry = map(_nunchuckY, nunchuckMinY, nunchuckMaxY, 32767, -32767);
+            } else {
+                gamepad16Report.X = map(_nunchuckX, nunchuckMaxX, nunchuckMinX, 32767, -32767);
+                gamepad16Report.Y = map(_nunchuckY, nunchuckMinY, nunchuckMaxY, 32767, -32767);
+            }
         }
         if(_autoReport) {
             report();
@@ -524,17 +543,17 @@ void AbsMouse5_::release(uint8_t button)
   }
 
   void Gamepad16_::nunchuckC(bool isPressed) {
-	if(isPressed != _nunchuckC){
-		_nunchuckC = isPressed;
-		isPressed ? press(PAD_LS) : release(PAD_LS);
-	}		
+    if(isPressed != _nunchuckC){
+        _nunchuckC = isPressed;
+        isPressed ? press(PAD_LS) : release(PAD_LS);
+    }        
   }
   
   void Gamepad16_::nunchuckZ(bool isPressed) {
-	if(isPressed != _nunchuckZ){
-		_nunchuckZ = isPressed;
-		isPressed ? press(PAD_RS) : release(PAD_RS);
-	}		
+    if(isPressed != _nunchuckZ){    
+        _nunchuckZ = isPressed;
+        isPressed ? press(PAD_RS) : release(PAD_RS);
+    }        
   }
   #endif
 

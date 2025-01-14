@@ -16,7 +16,7 @@
 
 #include <OpenFIREBoard.h>
 #include <stdint.h>
-
+#include "SharedStaticData.h"
 
 #if defined(ARDUINO_RASPBERRY_PI_PICO_W)
     #include <ArduinoJson.h>
@@ -36,11 +36,18 @@ public:
         Error_Erase = -5
     };
     
+    enum ControlMode_e {
+        ControlMode_Mouse,
+        ControlMode_Gamepad,
+        ControlMode_GamepadCamOnRightStick
+    };    
+    
     typedef struct TemporarySerialSettings_s {
         int rumbleActive = -1;
         int solenoidActive = -1;
         int autofireActive = -1;    
         int rumbleFF = -1;
+        int controlMode = -1;
     } __attribute__ ((packed)) TemporarySerialSettings_t;
     
     static TemporarySerialSettings_t temporarySerialSettings;
@@ -75,46 +82,59 @@ public:
     static bool GetSolenoidActive(){ return SamcoPreferences::temporarySerialSettings.solenoidActive != -1 ? SamcoPreferences::temporarySerialSettings.solenoidActive : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive; };
     static bool GetAutofireActive(){ return SamcoPreferences::temporarySerialSettings.autofireActive != -1 ? SamcoPreferences::temporarySerialSettings.autofireActive : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive; };
     static bool GetRumbleFF() {return SamcoPreferences::temporarySerialSettings.rumbleFF != -1 ? SamcoPreferences::temporarySerialSettings.rumbleFF : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF; };
+    static uint8_t GetControlMode() {return SamcoPreferences::temporarySerialSettings.controlMode != -1 ? SamcoPreferences::temporarySerialSettings.controlMode : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].controlMode; };
         
         
     static void SetRumbleActive(bool value, bool temporary = false) {
         if (temporary) {
+			if(GetRumbleActive() == value) return;
             SamcoPreferences::temporarySerialSettings.rumbleActive = value;
         } else {
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive = value;
             SamcoPreferences::temporarySerialSettings.rumbleActive = -1;
         }
-        
     }
     static void SetSolenoidActive(bool value, bool temporary = false) {
         
         if (temporary) {
+			if(GetSolenoidActive() == value) return;
             SamcoPreferences::temporarySerialSettings.solenoidActive = value;
         } else {
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive = value;
             SamcoPreferences::temporarySerialSettings.solenoidActive = -1;
         }
-        
     }
     static void SetAutofireActive(bool value, bool temporary = false) {
         
         if (temporary) {
+			if(GetAutofireActive() == value) return;
             SamcoPreferences::temporarySerialSettings.autofireActive = value;
         } else {
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive = value;
             SamcoPreferences::temporarySerialSettings.autofireActive = -1;
         }
-        
     }
     static void SetRumbleFF(bool value, bool temporary = false) {
         
         if (temporary) {
+			if(GetRumbleFF() == value) return;
             SamcoPreferences::temporarySerialSettings.rumbleFF = value;
         } else {
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF = value;
             SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
         }
-        
+    }
+    
+    static void SetControlMode(ControlMode_e value, bool temporary = false) {
+        SharedStaticData::controlMode = value;    
+
+        if (temporary) {
+			if(GetControlMode() == value) return;
+            SamcoPreferences::temporarySerialSettings.controlMode = value;
+        } else {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].controlMode = value;
+            SamcoPreferences::temporarySerialSettings.controlMode = -1;
+        }
     }
       
     //Used when pins are not set
@@ -134,6 +154,9 @@ public:
         for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].rumbleFF = false;}
         SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
     }        
+    
+        
+
     
     /// @brief Header ID
     typedef union HeaderId_u {
@@ -156,8 +179,6 @@ public:
         uint32_t buttonMask : 16;   // Button mask assigned to this profile
         bool irLayout;              // square or diamond IR for this display?
         uint32_t color   : 24;      // packed color blob per profile
-
-        
         uint8_t rumbleIntensity = 255;
         uint16_t rumbleInterval = 150;
         uint16_t solenoidNormalInterval = 45;
@@ -167,17 +188,14 @@ public:
         uint32_t customLEDcolor1 = 0xFF0000;
         uint32_t customLEDcolor2 = 0x00FF00;
         uint32_t customLEDcolor3 = 0x0000FF;
-        
         uint8_t ledPWM1Level = 7;
         uint8_t ledPWM2Level = 7;
         uint16_t ledPWMRecoilFadeDuration = 400;
-        
+        uint8_t controlMode = 0;
         bool rumbleActive = true;       // Are we allowed to do rumble?
         bool solenoidActive = true;     // Are we allowed to use a solenoid?
         bool autofireActive = false;    // Is autofire enabled?
         bool rumbleFF = false;          // Rumble force-feedback, instead of Solenoid    
-
-
         char name[16];               // Profile display name        
         
     } __attribute__ ((packed)) ProfileData_t;

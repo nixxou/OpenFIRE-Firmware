@@ -23,7 +23,6 @@
 #include <Arduino.h>
 #include <RP2040.h>
 #include <OpenFIREBoard.h>
-#include <Arduino.h>
 #include "SamcoPWMLed.h"
 //#include <LittleFS.h>
 
@@ -333,10 +332,10 @@ enum RunMode_e {
 // defaults can be populated here, but any values in EEPROM/Flash will override these.
 // top/bottom/left/right offsets, TLled/TRled, adjX/adjY, sensitivity, runmode, button mask mapped to profile, layout toggle, color, name
 SamcoPreferences::ProfileData_t profileData[ProfileCount] = {
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_A,      false, 0xFF0000, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile A"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_B,      false, 0x00FF00, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile B"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Start,  false, 0x0000FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile Start"},
-    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Select, false, 0xFF00FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, true, true, false, false, "Profile Select"}
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_A,      false, 0xFF0000, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, SamcoPreferences::ControlMode_e::ControlMode_Mouse, true, true, false, false, "Profile A"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_B,      false, 0x00FF00, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, SamcoPreferences::ControlMode_e::ControlMode_Mouse, true, true, false, false, "Profile B"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Start,  false, 0x0000FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, SamcoPreferences::ControlMode_e::ControlMode_Mouse, true, true, false, false, "Profile Start"},
+    {0, 0, 0, 0, 500 << 2, 1420 << 2, 512 << 2, 384 << 2, DFRobotIRPositionEx::Sensitivity_Default, RunMode_Average, BtnMask_Select, false, 0xFF00FF, 255, 150, 45, 30, 500, 3, 0xFF0000, 0x00FF00, 0x0000FF, 7, 7, 500, SamcoPreferences::ControlMode_e::ControlMode_Mouse, true, true, false, false, "Profile Select"}
 };
 
 
@@ -619,16 +618,13 @@ void setup() {
                     runMode = (RunMode_e)profileData[selectedProfile].runMode;
                 }
             }
-            /*
-            SamcoPreferences::LoadToggles();
-            if(SamcoPreferences::toggles.customPinsInUse) {
-                SamcoPreferences::LoadPins();
-            }
-            SamcoPreferences::LoadSettings();
-            SamcoPreferences::LoadUSBID();
-            */
+
         }
     }
+    
+    #ifdef USES_PWMLED
+        SamcoPWMLed::PwmLedInit();
+    #endif    
  
     // We're setting our custom USB identifiers, as defined in the configuration area!
     #ifdef USE_TINYUSB
@@ -654,6 +650,7 @@ void setup() {
     #ifdef USES_NUNCHUCK
         nextStepNunchuck = millis()+3000;
     #endif
+    
 
 #ifdef USE_TINYUSB
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(ENABLE_CLASSIC)
@@ -697,18 +694,18 @@ void setup() {
     OpenFIREper.source(profileData[selectedProfile].adjX, profileData[selectedProfile].adjY);
     OpenFIREper.deinit(0);
     
-    Serial.println("before sanity check");
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
+        /*
         WiFi.mode(WIFI_STA);
         Serial.println(SamcoPreferences::settings.apName);
         Serial.println(SamcoPreferences::settings.apPassword);
-        
+        */
         if(SamcoPreferences::settings.apName == ""){
-            wifiConnectStep = 20;    
+            wifiConnectStep = 90;    
         }
         else{
-            WiFi.begin(SamcoPreferences::settings.apName, SamcoPreferences::settings.apPassword);            
-            wifiConnectStep=1;
+            //WiFi.begin(SamcoPreferences::settings.apName, SamcoPreferences::settings.apPassword);            
+            wifiConnectStep=0;
         }
     #endif
 
@@ -1020,7 +1017,21 @@ void setup1()
 void loop1()
 {
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
-    if(wifiConnectStep >=1 && wifiConnectStep < 100){
+    if(wifiConnectStep >=0 && wifiConnectStep < 100){
+        if(wifiConnectStep==0){
+            WiFi.mode(WIFI_STA);
+            WiFi.persistent(true);
+            Serial.println(SamcoPreferences::settings.apName);
+            Serial.println(SamcoPreferences::settings.apPassword);
+            
+            if(SamcoPreferences::settings.apName == ""){
+                wifiConnectStep = 90;    
+            }
+            else{
+                WiFi.begin(SamcoPreferences::settings.apName, SamcoPreferences::settings.apPassword);            
+                wifiConnectStep=1;
+            }            
+        }
         if(wifiConnectStep>=1 && wifiConnectStep<90){
             unsigned long currentMillis = millis();
             if (currentMillis - previousWifiConnectStep >= 500) {
@@ -1031,11 +1042,11 @@ void loop1()
                 }
                 else{
                     Serial.println("to next step");
-                    wifiConnectStep = 20;
+                    wifiConnectStep = 90;
                 }
             }
         }
-        if(wifiConnectStep>=20 && wifiConnectStep < 100){
+        if(wifiConnectStep>=90 && wifiConnectStep < 100){
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.println();
                 Serial.print("Connecté à Wi-Fi. IP Adresse : ");
@@ -1073,40 +1084,38 @@ void loop1()
             server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
 
               
-              String jsonPayload;
-              int params = request->params();
-              for (int i = 0; i < params; i++) {
+            String jsonPayload;
+            int params = request->params();
+            for (int i = 0; i < params; i++) {
                 AsyncWebParameter* p = request->getParam(i);
                 if (p->name() == "jsonData") {
                   jsonPayload = p->value();
                 }
-              }
-              String txtResult = "Config edited !";
-              int code = 200;
-              // Vérification du JSON
-              
-              if (!SamcoPreferences::JsonToStructures(jsonPayload)) {
-                  code = 400;
-                  txtResult = "Error on JSON";
-              }
-              else{
-                  SamcoPreferences::SaveProfiles();
-                  /*
-                  SavePreferences();
-                  
-                    SamcoPreferences::LoadPresets();
-                    SamcoPreferences::LoadToggles();
-                    SamcoPreferences::LoadPins();
-                    
-                    SamcoPreferences::LoadSettings();
-                    SamcoPreferences::LoadUSBID();
-                */
-                      
-                                    
-                  
-                  
-              }
-              
+            }
+            String txtResult = "Config edited !";
+            int code = 200;
+            // Vérification du JSON
+
+            if (!SamcoPreferences::JsonToStructures(jsonPayload)) {
+              code = 400;
+              txtResult = "Error on JSON";
+            }
+            else{
+                SamcoPreferences::SaveProfiles();
+                SelectCalProfile(SamcoPreferences::profiles.selectedProfile);
+                AbsMouse5.releaseAll();
+                Keyboard.releaseAll();
+                Gamepad16.releaseAll();
+                #ifdef USES_DISPLAY
+                    if(!serialMode && gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Normal); }
+                    else if(serialMode && gunMode == GunMode_Run &&
+                            OLED.serialDisplayType > ExtDisplay::ScreenSerial_None &&
+                            OLED.serialDisplayType < ExtDisplay::ScreenSerial_Both) {
+                        OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single);
+                    }
+                #endif // USES_DISPLAY                    
+            }
+
 
                 String jsonString = SamcoPreferences::structuresToJson();
                 String html = R"(
@@ -1132,7 +1141,6 @@ void loop1()
         }
     }
     #endif        
-    
     
     if(gunMode == GunMode_Run) {
         // For processing the trigger specifically.
@@ -1307,6 +1315,7 @@ void checkWiFiConnection() {
     Serial.println("Déconnexion Wi-Fi détectée, tentative de reconnexion...");
     WiFi.disconnect();  // Déconnecter s'il y a un problème
     WiFi.mode(WIFI_STA);
+    WiFi.persistent(true);
     WiFi.begin(SamcoPreferences::settings.apName, SamcoPreferences::settings.apPassword);
     lastConnectionAttempt = currentMillis;  // Enregistrer le moment de la tentative de connexion
   }
@@ -2423,7 +2432,7 @@ void GetPosition()
                 buttons.offScreen = false;
             }
 
-            if(buttons.analogOutput) {
+            if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) {
                 Gamepad16.moveCam(conMoveX, conMoveY);
             } else {
                 AbsMouse5.move(conMoveX, conMoveY);
@@ -2535,7 +2544,7 @@ void TriggerFire()
     if(!buttons.offScreen &&                                     // Check if the X or Y axis is in the screen's boundaries, i.e. "off screen".
     !offscreenBShot) {                                           // And only as long as we haven't fired an off-screen shot,
         if(!buttonPressed) {
-            if(buttons.analogOutput) {
+            if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) {
                 Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); // No reason to handle this ourselves here, but eh.
             } else {
                 AbsMouse5.press(MOUSE_LEFT);                     // We're handling the trigger button press ourselves for a reason.
@@ -2550,7 +2559,7 @@ void TriggerFire()
     } else {  // We're shooting outside of the screen boundaries!
         if(!buttonPressed) {  // If we haven't pressed a trigger key yet,
             if(!OF_FFB.triggerHeld && offscreenButton) {  // If we are in offscreen button mode (and aren't dragging a shot offscreen)
-                if(buttons.analogOutput) {
+                if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) {
                     Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3);
                 } else {
                     AbsMouse5.press(MOUSE_RIGHT);
@@ -2558,7 +2567,7 @@ void TriggerFire()
                 offscreenBShot = true;                     // Mark we pressed the right button via offscreen shot mode,
                 buttonPressed = true;                      // Mark so we're not spamming these press events.
             } else {  // Or if we're not in offscreen button mode,
-                if(buttons.analogOutput) {
+                if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) {
                     Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3);
                 } else {
                     AbsMouse5.press(MOUSE_LEFT);
@@ -2577,7 +2586,7 @@ void TriggerNotFire()
     OF_FFB.triggerHeld = false;                                    // Disable the holding function
     if(buttonPressed) {
         if(offscreenBShot) {                                // If we fired off screen with the offscreenButton set,
-            if(buttons.analogOutput) {
+            if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) {
                 Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3);
             } else {
                 AbsMouse5.release(MOUSE_RIGHT);             // We were pressing the right mouse, so release that.
@@ -2585,7 +2594,7 @@ void TriggerNotFire()
             offscreenBShot = false;
             buttonPressed = false;
         } else {                                            // Or if not,
-            if(buttons.analogOutput) {
+            if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) {
                 Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3);
             } else {
                 AbsMouse5.release(MOUSE_LEFT);              // We were pressing the left mouse, so release that instead.
@@ -3423,7 +3432,7 @@ void SerialProcessing()
               #endif // LED_ENABLE
               #ifdef USES_DISPLAY
                   // init basic display to show mamehook icon
-                  if(gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single, buttons.analogOutput); }
+                  if(gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single); }
               #endif // USES_DISPLAY
           }
           break;
@@ -3440,17 +3449,20 @@ void SerialProcessing()
                     case '2':
                     // mouse & kb
                     case '0':
-                      buttons.analogOutput = false;
+                      //buttons.analogOutput = false;
+                      SamcoPreferences::SetControlMode(SamcoPreferences::ControlMode_e::ControlMode_Mouse,true);
                       break;
                     // gamepad
                     case '1':
-                      buttons.analogOutput = true;
-                      Gamepad16.stickRight = (Serial.peek() == 'L') ? true: false;
+                      if(Serial.peek() == 'R') SamcoPreferences::SetControlMode(SamcoPreferences::ControlMode_e::ControlMode_GamepadCamOnRightStick,true);
+                      else SamcoPreferences::SetControlMode(SamcoPreferences::ControlMode_e::ControlMode_Gamepad,true);
+                      
+                      //Gamepad16.stickRight = (Serial.peek() == 'L') ? true: false;
                       break;
                     // official "MiSTer optimized" mode
                     case '9':
-                      buttons.analogOutput = true;
-                      Gamepad16.stickRight = true;
+                      SamcoPreferences::SetControlMode(SamcoPreferences::ControlMode_e::ControlMode_Gamepad,true);
+                      //Gamepad16.stickRight = true;
                       // HACK SHACK - testing MiSTer-friendly default gamepad maps
                       LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3 = PAD_A,
                       LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3       = PAD_B,
@@ -3471,11 +3483,11 @@ void SerialProcessing()
                 Keyboard.releaseAll();
                 Gamepad16.releaseAll();
                 #ifdef USES_DISPLAY
-                    if(!serialMode && gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Normal, buttons.analogOutput); }
+                    if(!serialMode && gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Normal); }
                     else if(serialMode && gunMode == GunMode_Run &&
                             OLED.serialDisplayType > ExtDisplay::ScreenSerial_None &&
                             OLED.serialDisplayType < ExtDisplay::ScreenSerial_Both) {
-                        OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single, buttons.analogOutput);
+                        OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single);
                     }
                 #endif // USES_DISPLAY
                 break;
@@ -3629,7 +3641,7 @@ void SerialProcessing()
                     if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Both) {
                         OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Dual);
                     } else if(OLED.serialDisplayType > ExtDisplay::ScreenSerial_None) {
-                        OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single, buttons.analogOutput);
+                        OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single);
                     }
                 }
                 break;
@@ -3655,7 +3667,7 @@ void SerialProcessing()
                   serialARcorrection = false;
                   #ifdef USES_DISPLAY
                       OLED.serialDisplayType = ExtDisplay::ScreenSerial_None;
-                      if(gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Normal, buttons.analogOutput); }
+                      if(gunMode == GunMode_Run) { OLED.ScreenModeChange(ExtDisplay::Screen_Normal); }
                   #endif // USES_DISPLAY
                   #ifdef LED_ENABLE
                       serialLEDPulseColorMap = 0b00000000;               // Clear any stale serial LED pulses
@@ -4128,12 +4140,12 @@ void TriggerFireSimple()
 {
     if(!buttonPressed &&                             // Have we not fired the last cycle,
     offscreenButtonSerial && buttons.offScreen) {    // and are pointing the gun off screen WITH the offScreen button mode set?    
-        if(buttons.analogOutput) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3); } 
+        if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3); } 
           else { AbsMouse5.press(MOUSE_RIGHT); } 
         offscreenBShot = true;                       // Mark we pressed the right button via offscreen shot mode,
         buttonPressed = true;                        // Mark so we're not spamming these press events.
     } else if(!buttonPressed) {                      // Else, have we simply not fired the last cycle?
-          if(buttons.analogOutput) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
+          if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) { Gamepad16.press(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
           else { AbsMouse5.press(MOUSE_LEFT); }
         buttonPressed = true;                        // Set this so we won't spam a repeat press event again.
     }
@@ -4144,11 +4156,11 @@ void TriggerNotFireSimple()
 {
     if(buttonPressed) {                              // Just to make sure we aren't spamming mouse button events.
         if(offscreenBShot) {                         // if it was marked as an offscreen button shot,
-            if(buttons.analogOutput) { Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3); }
+            if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) { Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_A].reportCode3); }
               else { AbsMouse5.release(MOUSE_RIGHT); }
             offscreenBShot = false;                  // And set it off.
         } else {                                     // Else,
-            if(buttons.analogOutput) { Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
+            if(SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse) { Gamepad16.release(LightgunButtons::ButtonDesc[BtnIdx_Trigger].reportCode3); }
               else { AbsMouse5.release(MOUSE_LEFT); }
         }
         buttonPressed = false;                       // Unset the button pressed bit.
@@ -4195,9 +4207,9 @@ void SetMode(GunMode_e newMode)
           if(OLED.serialDisplayType == ExtDisplay::ScreenSerial_Both) {
             OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Dual);
           } else if(serialMode) {
-            OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single, buttons.analogOutput);
+            OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single);
           } else {
-            OLED.ScreenModeChange(ExtDisplay::Screen_Normal, buttons.analogOutput);
+            OLED.ScreenModeChange(ExtDisplay::Screen_Normal);
           }
           OLED.TopPanelUpdate("Prof: ", profileData[selectedProfile].name);
         #endif // USES_DISPLAY
@@ -4622,6 +4634,10 @@ void LoadPreferences()
     Serial.println("Debug : LoadPref1");
     nvPrefsError = SamcoPreferences::LoadProfiles();
     
+    uint8_t controlMode = SamcoPreferences::GetControlMode();
+    SharedStaticData::controlMode = controlMode;
+    SharedStaticData::loop1Started = true;
+    
     //nvPrefsError = SamcoPreferences::Error_NoStorage;
     Serial.println("Debug : LoadPref2");
     VerifyPreferences();
@@ -4822,7 +4838,12 @@ bool SelectCalProfile(unsigned int profile)
     if(profileData[profile].runMode < RunMode_Count) {
         SetRunMode((RunMode_e)profileData[profile].runMode);
     }
-
+    
+    uint8_t controlMode = SamcoPreferences::GetControlMode();
+    SharedStaticData::controlMode = controlMode;
+    Serial.print("Change control mode to : ");
+    Serial.println(controlMode);
+    
     #ifdef USES_DISPLAY
         if(gunMode != GunMode_Docked) { OLED.TopPanelUpdate("Using ", profileData[selectedProfile].name); }
     #endif // USES_DISPLAY
@@ -4836,6 +4857,8 @@ bool SelectCalProfile(unsigned int profile)
         SamcoPWMLed::SetLedPWM2Level();
         SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoil_Inactif);
     #endif
+    
+    
 
     // enable save to allow setting new default profile
     stateFlags |= StateFlag_SavePreferencesEn;

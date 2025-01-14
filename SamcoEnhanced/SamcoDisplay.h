@@ -49,7 +49,7 @@ public:
 
     /// @brief Clear screen for different gun modes
     /// @return nothing
-    void ScreenModeChange(int8_t screenMode, bool isAnalog = false);
+    void ScreenModeChange(int8_t screenMode);
 
     /// @brief Perform maintenance operations (WIP)
     /// @details For when values aren't being updated, but still want to change something on the screen

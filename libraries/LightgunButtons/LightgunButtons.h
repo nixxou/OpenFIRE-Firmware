@@ -22,6 +22,7 @@
 #define _LIGHTGUNBUTTONS_H_
 
 #include <stdint.h>
+#include "SharedStaticData.h"
 
 /// @brief Relatively simple buttons with some decent per-button confirgurable debouncing.
 /// @details While intended for a Light gun, can be used for any HID using AbsMouse5 and/or Keyboard.

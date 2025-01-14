@@ -163,7 +163,7 @@ uint32_t LightgunButtons::Poll(unsigned long minTicks)
                         // if reporting is enabled for the button
                         if(report & bitMask) {
                             reportedPressed |= bitMask;
-                            if(analogOutput) {
+                            if(SharedStaticData::controlMode != SharedStaticData::ControlMode_e::ControlMode_Mouse) {
                                 if(btn.reportType3 == ReportType_Mouse) {
                                     AbsMouse5.press(btn.reportCode3);
                                 } else if(btn.reportType3 == ReportType_Keyboard) {
@@ -222,7 +222,7 @@ uint32_t LightgunButtons::Poll(unsigned long minTicks)
                         // in case the reporting is disabled while button(s) are pressed
                         if(reportedPressed & bitMask) {
                             reportedPressed &= ~bitMask;
-                            if(analogOutput) {
+                            if(SharedStaticData::controlMode != SharedStaticData::ControlMode_e::ControlMode_Mouse) {
                                 if(btn.reportType3 == ReportType_Mouse) {
                                     AbsMouse5.release(btn.reportCode3);
                                 } else if(btn.reportType3 == ReportType_Keyboard) {

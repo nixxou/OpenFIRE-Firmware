@@ -42,6 +42,7 @@
  */
 
 #include <Arduino.h>
+#include "SharedStaticData.h"
 
 /*****************************
  *   GLOBAL SECTION
@@ -72,55 +73,55 @@ extern TinyUSBDevices_ TinyUSBDevices;
 
 #if defined(USE_TINYUSB)
 #define TUD_HID_REPORT_DESC_ABSMOUSE5(...) \
-	0x05, 0x01, \
-	0x09, 0x02, \
-	0xA1, 0x01, \
-	__VA_ARGS__ \
-	0x09, 0x01, \
-	0xA1, 0x00, \
-	0x05, 0x09, \
-	0x19, 0x01, \
-	0x29, 0x05, \
-	0x15, 0x00, \
-	0x25, 0x01, \
-	0x95, 0x05, \
-	0x75, 0x01, \
-	0x81, 0x02, \
-	0x95, 0x01, \
-	0x75, 0x03, \
-	0x81, 0x03, \
-	0x05, 0x01, \
-	0x09, 0x30, \
-	0x09, 0x31, \
-	0x16, 0x00, 0x00, \
-	0x26, 0xFF, 0x7F, \
-	0x36, 0x00, 0x00, \
-	0x46, 0xFF, 0x7F, \
-	0x75, 0x10, \
-	0x95, 0x02, \
-	0x81, 0x02, \
-	0xC0, \
-	0xC0
+    0x05, 0x01, \
+    0x09, 0x02, \
+    0xA1, 0x01, \
+    __VA_ARGS__ \
+    0x09, 0x01, \
+    0xA1, 0x00, \
+    0x05, 0x09, \
+    0x19, 0x01, \
+    0x29, 0x05, \
+    0x15, 0x00, \
+    0x25, 0x01, \
+    0x95, 0x05, \
+    0x75, 0x01, \
+    0x81, 0x02, \
+    0x95, 0x01, \
+    0x75, 0x03, \
+    0x81, 0x03, \
+    0x05, 0x01, \
+    0x09, 0x30, \
+    0x09, 0x31, \
+    0x16, 0x00, 0x00, \
+    0x26, 0xFF, 0x7F, \
+    0x36, 0x00, 0x00, \
+    0x46, 0xFF, 0x7F, \
+    0x75, 0x10, \
+    0x95, 0x02, \
+    0x81, 0x02, \
+    0xC0, \
+    0xC0
 #endif // USE_TINYUSB
 
 // 5 button absolute mouse
 class AbsMouse5_
 {
 private:
-	const uint8_t _reportId;
-	uint8_t _buttons;
-	uint16_t _x;
-	uint16_t _y;
-	bool _autoReport;
+    const uint8_t _reportId;
+    uint8_t _buttons;
+    uint16_t _x;
+    uint16_t _y;
+    bool _autoReport;
 
 public:
-	AbsMouse5_(uint8_t reportId = 1);
-	void init(bool autoReport = true);
-	void report(void);
-	void move(uint16_t x, uint16_t y);
-	void press(uint8_t b = MOUSE_LEFT);
-	void release(uint8_t b = MOUSE_LEFT);
-	void releaseAll() { release(0x1f); }
+    AbsMouse5_(uint8_t reportId = 1);
+    void init(bool autoReport = true);
+    void report(void);
+    void move(uint16_t x, uint16_t y);
+    void press(uint8_t b = MOUSE_LEFT);
+    void release(uint8_t b = MOUSE_LEFT);
+    void releaseAll() { release(0x1f); }
 };
 
 // global singleton
@@ -296,10 +297,10 @@ typedef struct {
 } __attribute__ ((packed)) gamepad16Report_s;
 
 #ifdef USES_NUNCHUCK
-	extern int nunchuckMinX;
-	extern int nunchuckMaxX;
-	extern int nunchuckMinY;
-	extern int nunchuckMaxY;
+    extern int nunchuckMinX;
+    extern int nunchuckMaxX;
+    extern int nunchuckMinY;
+    extern int nunchuckMaxY;
 #endif
 
 class Gamepad16_ {

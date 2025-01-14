@@ -111,8 +111,9 @@ void ExtDisplay::TopPanelUpdate(char textPrefix[7], char textInput[16])
     }
 }
 
-void ExtDisplay::ScreenModeChange(int8_t screenMode, bool isAnalog)
+void ExtDisplay::ScreenModeChange(int8_t screenMode)
 {
+    bool isAnalog = (SamcoPreferences::GetControlMode() != SamcoPreferences::ControlMode_e::ControlMode_Mouse);
     if(displayValid) {
         display->fillRect(0, 16, 128, 48, BLACK);
         if(screenState >= Screen_Mamehook_Single &&
