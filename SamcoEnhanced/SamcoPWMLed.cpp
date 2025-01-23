@@ -11,24 +11,12 @@ void SamcoPWMLed::PwmLedInit()
     if (SamcoPreferences::pins.oLedPWMControl1 > 0) {
         pinMode(SamcoPreferences::pins.oLedPWMControl1, OUTPUT);
         //analogWriteFreq(1000); // Fréquence seulement
-        analogWrite(SamcoPreferences::pins.oLedPWMControl1, 
-            SamcoPWMLed::PwmValueFromLevel(
-                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM1Level,
-                SamcoPreferences::settings.ledPWM1_min,
-                SamcoPreferences::settings.ledPWM1_max
-            )
-        );
+        analogWrite(SamcoPreferences::pins.oLedPWMControl1, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM1Level);
     }
     if (SamcoPreferences::pins.oLedPWMControl2 > 0) {
         pinMode(SamcoPreferences::pins.oLedPWMControl2, OUTPUT);
         //analogWriteFreq(1000);
-        analogWrite(SamcoPreferences::pins.oLedPWMControl2, 
-            SamcoPWMLed::PwmValueFromLevel(
-                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM2Level,
-                SamcoPreferences::settings.ledPWM2_min,
-                SamcoPreferences::settings.ledPWM2_max
-            )
-        );
+        analogWrite(SamcoPreferences::pins.oLedPWMControl2, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM2Level);
     }
     if (SamcoPreferences::pins.oLedPWMControlRecoil > 0) {
         pinMode(SamcoPreferences::pins.oLedPWMControlRecoil, OUTPUT);
@@ -37,110 +25,82 @@ void SamcoPWMLed::PwmLedInit()
     }
     
     SamcoPWMLed::State_LedPWMRecoil = SamcoPWMLed::LedPWMRecoil_Inactif;
-    SamcoPWMLed::Level_LedPWMRecoil = 10;
+    SamcoPWMLed::Level_LedPWMRecoil = SamcoPreferences::settings.ledPWMRecoil_max;
     SamcoPWMLed::lastUpdateTime = 0;
 }
 
-void SamcoPWMLed::SetLedPWM1Level(uint8_t level){
+void SamcoPWMLed::PwmLedSleep()
+{
+    if (SamcoPreferences::pins.oLedPWMControl1 > 0) analogWrite(SamcoPreferences::pins.oLedPWMControl1, 0);
+    if (SamcoPreferences::pins.oLedPWMControl2 > 0) analogWrite(SamcoPreferences::pins.oLedPWMControl2, 0);
+    if (SamcoPreferences::pins.oLedPWMControlRecoil > 0) analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, 0);
+    SamcoPWMLed::State_LedPWMRecoil = SamcoPWMLed::LedPWMRecoil_Inactif;
+    SamcoPWMLed::Level_LedPWMRecoil = SamcoPreferences::settings.ledPWMRecoil_max;
+    SamcoPWMLed::lastUpdateTime = 0;
+}
+
+void SamcoPWMLed::SetLedPWM1Level(int level){
+    if(level >= 255) level = 255;
     if (SamcoPreferences::pins.oLedPWMControl1 > 0) {
         if(level >= 0) SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM1Level = level;
-        analogWrite(SamcoPreferences::pins.oLedPWMControl1, 
-            SamcoPWMLed::PwmValueFromLevel(
-                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM1Level,
-                SamcoPreferences::settings.ledPWM1_min,
-                SamcoPreferences::settings.ledPWM1_max
-            )
-        );
+        analogWrite(SamcoPreferences::pins.oLedPWMControl1, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM1Level);
     }
 }
 
-void SamcoPWMLed::SetLedPWM2Level(uint8_t level){
+void SamcoPWMLed::SetLedPWM2Level(int level){
+    if(level >= 255) level = 255;   
     if (SamcoPreferences::pins.oLedPWMControl2 > 0) {
-        if(level >= 0) SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM2Level = level;
-        analogWrite(SamcoPreferences::pins.oLedPWMControl2, 
-            SamcoPWMLed::PwmValueFromLevel(
-                SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM2Level,
-                SamcoPreferences::settings.ledPWM2_min,
-                SamcoPreferences::settings.ledPWM2_max
-            )
-        );
+        if(level >= 0) SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM2Level = level;     
+        analogWrite(SamcoPreferences::pins.oLedPWMControl2, SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWM2Level);
     }
 }
     
 
-uint8_t SamcoPWMLed::PwmValueFromLevel(uint8_t level, uint8_t min, uint8_t max)
-{
-    // Gérer les cas limites
-    if (level == 0) return 0;           // Retourne 0 si le niveau est 0
-    if (max > 255) max = 255;           // Clamp max à 255
-    if (level > 10) level = 10;         // Clamp level à 10
-
-    if(max < min) min = max;
-    // Si level == 1, retourne min, si level == 10, retourne max
-    if (level == 1) return min;
-    if (level == 10) return max;
-
-    // Calculer la valeur interpolée pour les niveaux intermédiaires
-    uint8_t pwmValue = min + (((max - min) * (level - 1) + 4) / 9);
-
-    return pwmValue;
-}
-
 void SamcoPWMLed::UpdateRecoilLed() {
     // Ne traiter que si l'état est LedPWMRecoil_Fade ou LedPWMRecoil_Actif
-    if (SamcoPreferences::pins.oLedPWMControlRecoil < 0 || SamcoPWMLed::State_LedPWMRecoil == SamcoPWMLed::LedPWMRecoil_Actif) {
+    if (SamcoPreferences::pins.oLedPWMControlRecoil < 0) {
         return; // Pas de réduction nécessaire si la LED est à pleine intensité
     }
+    if(SamcoPWMLed::State_LedPWMRecoil == SamcoPWMLed::LedPWMRecoil_Fade) {
+        uint32_t currentTime = millis(); // Temps actuel
 
-    uint32_t currentTime = millis(); // Temps actuel
+        // Vérifie si le délai entre les mises à jour est écoulé
+        if (currentTime - SamcoPWMLed::lastUpdateTime >= (SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWMRecoilFadeDuration / (((float)SamcoPreferences::settings.ledPWMRecoil_max) * 10.5f))) {
+            SamcoPWMLed::lastUpdateTime = currentTime;
+            float progress = ((float)SamcoPWMLed::Level_LedPWMRecoil / (float)SamcoPreferences::settings.ledPWMRecoil_max);
+            float speedFactor = 20.0f * progress + 1.0f; // Entre 1.0 (début) et 6.0 (fin)
+            float reductionStep = (((float)SamcoPreferences::settings.ledPWMRecoil_max) / SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWMRecoilFadeDuration) * speedFactor;
+            uint8_t previousLevel = SamcoPWMLed::Level_LedPWMRecoil;
 
-    // Vérifie si le délai entre les mises à jour est écoulé
-    if (currentTime - SamcoPWMLed::lastUpdateTime >= (SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWMRecoilFadeDuration / 10)) {
-        SamcoPWMLed::lastUpdateTime = currentTime;
+            SamcoPWMLed::Level_LedPWMRecoil -= reductionStep;
+            if (SamcoPWMLed::Level_LedPWMRecoil < 0) SamcoPWMLed::Level_LedPWMRecoil = 0; // Éviter les valeurs négatives
 
-        // Calculer la vitesse de réduction proportionnelle
-        float speedFactor = 1.0f + 2.0f * (float(SamcoPWMLed::Level_LedPWMRecoil) / 10.0f); // Entre 1.0 et 3.0
-        float reductionStep = (10.0f / SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWMRecoilFadeDuration) * speedFactor;
+            analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, SamcoPWMLed::Level_LedPWMRecoil);
 
-        // Réduire le niveau
-        SamcoPWMLed::Level_LedPWMRecoil -= reductionStep;
-        if (SamcoPWMLed::Level_LedPWMRecoil < 0) SamcoPWMLed::Level_LedPWMRecoil = 0; // Éviter les valeurs négatives
-
-        // Appliquer la nouvelle valeur de PWM
-        analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, 
-            SamcoPWMLed::PwmValueFromLevel(
-                SamcoPWMLed::Level_LedPWMRecoil,
-                SamcoPreferences::settings.ledPWMRecoil_min,
-                SamcoPreferences::settings.ledPWMRecoil_max
-            )
-        );
-
-        // Vérifier si la luminosité est tombée au minimum
-        if (SamcoPWMLed::Level_LedPWMRecoil <= SamcoPreferences::settings.ledPWMRecoil_min) {
-            analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, 0);
-            SamcoPWMLed::Level_LedPWMRecoil = 0;
-            SamcoPWMLed::State_LedPWMRecoil = SamcoPWMLed::LedPWMRecoil_Inactif; // Passer à l'état inactif
+            if (SamcoPWMLed::Level_LedPWMRecoil <= SamcoPreferences::settings.ledPWMRecoil_min) {
+                analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, 0);
+                SamcoPWMLed::Level_LedPWMRecoil = 0;
+                SamcoPWMLed::State_LedPWMRecoil = SamcoPWMLed::LedPWMRecoil_Inactif; // Passer à l'état inactif
+            }
         }
+
+
     }
+
 }
 
 void SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoilState newState) {
-    if (SamcoPWMLed::State_LedPWMRecoil == newState) {
+    if (SamcoPWMLed::State_LedPWMRecoil == newState && newState != SamcoPWMLed::LedPWMRecoil_Inactif) {
         return; // Pas de changement d'état
     }
-
     SamcoPWMLed::State_LedPWMRecoil = newState;
-    if (newState == SamcoPWMLed::LedPWMRecoil_Actif) {
+    if (newState == SamcoPWMLed::LedPWMRecoil_Actif && SamcoPreferences::settings.ledPWMRecoil_max > 0) {
         // Si l'état devient actif, on initialise la LED à pleine intensité
-        SamcoPWMLed::Level_LedPWMRecoil = 10;
-        analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, 
-            SamcoPWMLed::PwmValueFromLevel(SamcoPWMLed::Level_LedPWMRecoil, 
-                SamcoPreferences::settings.ledPWMRecoil_min, 
-                SamcoPreferences::settings.ledPWMRecoil_max)
-        );
+        SamcoPWMLed::Level_LedPWMRecoil = SamcoPreferences::settings.ledPWMRecoil_max;
+        analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, SamcoPreferences::settings.ledPWMRecoil_max);
     } else if (newState == SamcoPWMLed::LedPWMRecoil_Fade) {
         // Démarrer l'état Fade (réduction de la luminosité)
-        SamcoPWMLed::Level_LedPWMRecoil = 10;
+        SamcoPWMLed::Level_LedPWMRecoil = SamcoPreferences::settings.ledPWMRecoil_max;
     } else if (newState == SamcoPWMLed::LedPWMRecoil_Inactif) {
         // Éteindre la LED si elle est inactif
         analogWrite(SamcoPreferences::pins.oLedPWMControlRecoil, 0);
@@ -149,15 +109,17 @@ void SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoilState newState) {
 }
 
 void SamcoPWMLed::StartRecoilLed(){
-    if (SamcoPreferences::pins.oLedPWMControl1 > 0) {
+    if (SamcoPreferences::pins.oLedPWMControlRecoil > 0) {
         SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoil_Actif);
     }
 }
 
 void SamcoPWMLed::StopRecoilLed(){
-    if (SamcoPreferences::pins.oLedPWMControl1 > 0) {
-        if(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWMRecoilFadeDuration > 0) SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoil_Fade);
-        else SamcoPWMLed::SetRecoilState(SamcoPWMLed::SamcoPWMLed::LedPWMRecoil_Inactif);
+    if (SamcoPreferences::pins.oLedPWMControlRecoil > 0) {
+        if (SamcoPWMLed::State_LedPWMRecoil == SamcoPWMLed::LedPWMRecoil_Actif){
+            if(SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].ledPWMRecoilFadeDuration > 0) SamcoPWMLed::SetRecoilState(SamcoPWMLed::LedPWMRecoil_Fade);
+            else SamcoPWMLed::SetRecoilState(SamcoPWMLed::SamcoPWMLed::LedPWMRecoil_Inactif);
+        }
     }
 }
 #endif

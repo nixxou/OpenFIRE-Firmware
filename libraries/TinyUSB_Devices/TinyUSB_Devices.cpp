@@ -505,8 +505,8 @@ void AbsMouse5_::release(uint8_t button)
     int centerX = (nunchuckMinX + nunchuckMaxX)/2.0;
     int centerY = (nunchuckMinY + nunchuckMaxY)/2.0;
     int deadzone = 0;
-    if(origX < centerX+4 && origX > centerX-4) deadzone++;
-    if(origY < centerY+4 && origY > centerY-4) deadzone++;
+    if(origX < centerX+10 && origX > centerX-10) deadzone++;
+    if(origY < centerY+10 && origY > centerY-10) deadzone++;
     
     if(deadzone==2){
         origX = centerX;

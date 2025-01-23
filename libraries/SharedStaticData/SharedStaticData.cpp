@@ -22,3 +22,17 @@
 
 uint8_t SharedStaticData::controlMode = SharedStaticData::ControlMode_e::ControlMode_Mouse;
 bool SharedStaticData::loop1Started = false;
+
+// Définition des variables statiques
+unsigned long SharedStaticData::reservedI2CUntil = 0;
+volatile bool SharedStaticData::i2cLock = false;
+
+uint8_t SharedStaticData::analogDpadStartPin = -1;
+uint8_t SharedStaticData::analogDpadSelectPin = -1;
+
+uint8_t SharedStaticData::analogDpadUpState = 0;
+uint8_t SharedStaticData::analogDpadDownState = 0;
+uint8_t SharedStaticData::analogDpadToggleState = 0;
+uint8_t SharedStaticData::analogDpadLeftState = 0;
+uint8_t SharedStaticData::analogDpadRightState = 0;
+uint8_t SharedStaticData::analogDpadMidState = 0;

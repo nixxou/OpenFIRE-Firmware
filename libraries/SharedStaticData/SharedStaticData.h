@@ -21,8 +21,7 @@
 #ifndef _SHAREDSTATICDATA_H_
 #define _SHAREDSTATICDATA_H_
 
-#include <stdint.h>
-
+#include <Arduino.h>
 
 class SharedStaticData {
 public:
@@ -34,6 +33,40 @@ public:
     
     static uint8_t controlMode;
     static bool loop1Started;
+
+	static uint8_t analogDpadStartPin;
+	static uint8_t analogDpadSelectPin;
+	static uint8_t analogDpadUpState;
+	static uint8_t analogDpadDownState;
+	static uint8_t analogDpadToggleState;
+	static uint8_t analogDpadLeftState;
+	static uint8_t analogDpadRightState;
+	static uint8_t analogDpadMidState;
+
+
+	
+    static unsigned long reservedI2CUntil;  // Temps jusqu'à lequel l'I2C est réservé
+    static volatile bool i2cLock;          // Mutex simulé (drapeau)
+
+    // Méthode pour essayer de réserver l'I2C
+	static bool tryReserveI2C(unsigned long durationMs) {
+		if (!SharedStaticData::i2cLock) {  // Essaye de verrouiller
+		
+			unsigned long currentMillis = millis();
+			if (currentMillis > SharedStaticData::reservedI2CUntil) {
+				SharedStaticData::i2cLock=true;
+				SharedStaticData::reservedI2CUntil = currentMillis + durationMs;  // Réserve l'I2C
+				return true;
+			}
+		
+		}
+		return false;  // Mutex non dispo
+	}
+
+
+	static void releaseI2C() {
+		SharedStaticData::i2cLock = false;
+	}
 
 };
 

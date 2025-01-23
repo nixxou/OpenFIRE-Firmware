@@ -50,10 +50,11 @@ void LightgunButtons::Begin()
     for(unsigned int i = 0; i < count; ++i) {
         // do no setup if the pin is uninitialized
         if(ButtonDesc[i].pin >= 0) {
-            pinMode(ButtonDesc[i].pin, INPUT_PULLUP);
-            stateFifo[i] = 0xFFFFFFFF;
-            debounceCount[i] = 0;
+            if(ButtonDesc[i].pin == SharedStaticData::analogDpadStartPin || ButtonDesc[i].pin == SharedStaticData::analogDpadSelectPin) pinMode(ButtonDesc[i].pin, INPUT_PULLDOWN);
+            else pinMode(ButtonDesc[i].pin, INPUT_PULLUP);
         }
+        stateFifo[i] = 0xFFFFFFFF;
+        debounceCount[i] = 0;        
     }
 }
 
@@ -63,9 +64,9 @@ void LightgunButtons::Unset()
     for(unsigned int i = 0; i < count; ++i) {
         // do no setup if the pin is uninitialized
         if(ButtonDesc[i].pin >= 0) {
-            pinMode(ButtonDesc[i].pin, INPUT);
-            debounceCount[i] = 0;
+            pinMode(ButtonDesc[i].pin, INPUT); 
         }
+        debounceCount[i] = 0;
     }
     pressed = 0;
     released = 0;
@@ -100,7 +101,7 @@ uint32_t LightgunButtons::Poll(unsigned long minTicks)
         bitMask = 1;
         for(unsigned int i = 0; i < count; ++i, bitMask <<= 1) {
             const Desc_t& btn = ButtonDesc[i];
-            if(ButtonDesc[i].pin >= 0) {
+            //if(ButtonDesc[i].pin >= 0) {
                 if(debounceCount[i]) {
                     if(ticks < debounceCount[i]) {
                         debounceCount[i] -= ticks;
@@ -109,20 +110,71 @@ uint32_t LightgunButtons::Poll(unsigned long minTicks)
                         debouncing &= ~bitMask;
                     }
                 }
-            }
+            //}
         }
     }
-
+    
     bitMask = 1;
     for(unsigned int i = 0; i < count; ++i, bitMask <<= 1) {
         const Desc_t& btn = ButtonDesc[i];
 
+        uint8_t analogForcedState = 0;
+        bool isAnalogMidClick = false;
+        bool isToogleClick = false;
+        #ifdef USES_ANALOGDPAD
+        if((ButtonDesc[i].reportCode3>=PAD_UP && ButtonDesc[i].reportCode3<=PAD_RIGHT) || ButtonDesc[i].reportCode3 == MOUSE_MIDDLE){  
+            switch(ButtonDesc[i].reportCode3){
+                case PAD_UP:
+                    analogForcedState = SharedStaticData::analogDpadUpState;
+                    break;
+                case PAD_DOWN:
+                    analogForcedState = SharedStaticData::analogDpadDownState;
+                    break;
+                case PAD_LEFT:
+                    analogForcedState = SharedStaticData::analogDpadLeftState;
+                    break;
+                case PAD_RIGHT:
+                    analogForcedState = SharedStaticData::analogDpadRightState;
+                    break;
+                case MOUSE_MIDDLE:
+                    analogForcedState = SharedStaticData::analogDpadMidState;
+                    isAnalogMidClick = true;
+                    break;
+            }
+        }
+        else if(i == (count-1)){
+            analogForcedState = SharedStaticData::analogDpadToggleState;
+            isToogleClick = true;
+        }
+        #endif
+
         // do no processing if the pin is uninitialized
-        if(ButtonDesc[i].pin >= 0) {
+        if(ButtonDesc[i].pin >= 0 || analogForcedState >0) {
             // if not debouncing
             if(!debounceCount[i]) {
                 // read the pin, expected to return 0 or 1
-                uint32_t state = digitalRead(btn.pin);
+                #ifdef USES_ANALOGDPAD
+                uint32_t state = analogForcedState != 2 ? 1 : 0; 
+                if(analogForcedState > 0){
+                    if(isAnalogMidClick || isToogleClick){
+                        if(ButtonDesc[i].pin >= 0) state = digitalRead(btn.pin);
+                        else state = 1;
+                        if(state == 1 && analogForcedState == 2) state = 0;
+                    }
+                    else{
+                        state = analogForcedState != 2 ? 1 : 0;
+                    }
+                }
+                else{
+                    if(ButtonDesc[i].pin >= 0) state = digitalRead(btn.pin);
+                    else state = 1;
+                }
+                if(ButtonDesc[i].pin >= 0 && (ButtonDesc[i].pin == SharedStaticData::analogDpadStartPin || ButtonDesc[i].pin == SharedStaticData::analogDpadSelectPin)){
+                    state = (state == 0 ? 1 : 0);
+                }
+                #else
+                    uint32_t state = digitalRead(btn.pin);
+                #endif
 
                 // if a state fifo mask is defined
                 if(btn.debounceFifoMask) {

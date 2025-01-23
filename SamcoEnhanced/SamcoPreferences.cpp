@@ -33,17 +33,14 @@ bool SamcoPreferences::fsInitialized = false;
 
 
 int SamcoPreferences::LoadProfiles()
-{
-  Serial.println("LoadProfiles()");
-  
+{ 
   if(!SamcoPreferences::fsInitialized){
      baseJson = SamcoPreferences::structuresToJson();
   // Initialiser LittleFS
       if (!LittleFS.begin()) {
-        Serial.println("Erreur: Impossible de monter le système de fichiers.");
+        Serial.println("Erreur: Impossible de monter le systeme de fichiers.");
         return Error_NoStorage;
       }
-      Serial.println("LittleFS monté avec succès.");  
       SamcoPreferences::fsInitialized = true;
   }
 
@@ -52,23 +49,19 @@ int SamcoPreferences::LoadProfiles()
     File file = LittleFS.open("/config.txt", "r");
     if (file) {
       String fileContent = "";
-      //Serial.println("Contenu de config.txt (lecture avec un buffer) :");
-      char buffer[512 + 1];  // +1 pour le caractère nul (terminaison de chaîne)
+      char buffer[512 + 1];  // +1 pour le caractï¿½re nul (terminaison de chaï¿½ne)
       size_t bytesRead = 0;
 
       while (file.available()) {
         bytesRead = file.readBytes(buffer, 512);
-        buffer[bytesRead] = '\0';  // Assurez-vous que la chaîne est terminée
-        //Serial.print(buffer);
+        buffer[bytesRead] = '\0';  // Assurez-vous que la chaï¿½ne est terminï¿½e
         fileContent += buffer;
       }
       file.close();
-      //Serial.println();  // Pour finir la ligne après la lecture
       SamcoPreferences::JsonToStructures(fileContent);
       return Error_Success; 
     } else {
       return Error_Read;
-      //Serial.println("Erreur: Impossible de lire config.txt.");
     }
   }
   
@@ -82,10 +75,8 @@ int SamcoPreferences::SaveProfiles()
   String JsonData = SamcoPreferences::structuresToJson();
   size_t taille = JsonData.length();
 
-  Serial.print("La taille de la chaîne est : ");
-  Serial.println(taille);  
   
-  // Écriture avec un buffer
+  // ï¿½criture avec un buffer
   File file = LittleFS.open("/config.txt", "w");
   if (file) {
     size_t bytesWritten = 0;
@@ -95,9 +86,8 @@ int SamcoPreferences::SaveProfiles()
       bytesWritten += chunkSize;
     }
     file.close();
-    Serial.println("Écriture réussie avec un buffer dans config.txt.");
   } else {
-    Serial.println("Erreur: Impossible d'écrire dans config.txt.");
+    Serial.println("Erreur: Impossible d'ecrire dans config.txt.");
   }    
 
     return Error_Success;
@@ -296,22 +286,74 @@ void SamcoPreferences::LoadPresets()
         pins.oPixel = -1;
     #endif // CUSTOM_NEOPIXEL
 
+    #ifdef USES_NUNCHUCK
+        pins.pNunchuckSDA = 2;
+        pins.pNunchuckSCL = 3;
+    #endif // CUSTOM_NEOPIXEL
+
+    #ifdef USES_DISPLAY
+        pins.pPeriphSDA = 18;
+        pins.pPeriphSCL = 19;
+    #endif
+
     pins.oRumble = 17;
     pins.oSolenoid = 16;
     pins.bTrigger = 15;
     pins.bGunA = 0;
     pins.bGunB = 1;
-    pins.bGunC = 2;
-    pins.bStart = 3;
-    pins.bSelect = 4;
-    pins.bGunUp = 6;
-    pins.bGunDown = 7;
-    pins.bGunLeft = 8;
-    pins.bGunRight = 9;
-    pins.bPedal = 14;
+    pins.bGunC = 4;
+    pins.bStart = -1;
+    pins.bSelect = -1;
+    pins.bGunUp = -1;
+    pins.bGunDown = -1;
+    pins.bGunLeft = -1;
+    pins.bGunRight = -1;
+    pins.bPedal = -1;
     pins.bPedal2 = -1;
     pins.bPump = 13;
     pins.bHome = 5;
+
+    #ifdef USES_ANALOGDPAD
+    pins.bDpadAnalogicStart = 6;
+    pins.bDpadAnalogicSelect = 7;
+    pins.bDpadAnalogicUpDownToggle = 27;
+    pins.bDpadAnalogicLeftRightMiddle = 26;
+    #endif
+
+    #ifdef USES_PWMLED
+    pins.oLedPWMControl1 = 8;
+    pins.oLedPWMControl2 = 9;
+    pins.oLedPWMControlRecoil = 22;
+    #endif
+
+    pins.bThumb = 14;
+    pins.bToggle = -1;
+
+/*
+                                        (_____)
+                     A Button     0  |-) *USB* (-| VBUS (USB voltage)
+                     B Button     1  |-)       (-| VSYS (Input from Battery/Output to NeoPixels)
+                                 GND |x)       (x| GND
+                     Nunchuck SDA 2  |-)       (x| 3V3 En
+                     Nunchuck SCL 3  |-)       (p| 3V3 Out (to Display/Cam/Analog Inputs)
+                     C Button     4  |-)       (x| ADCVREF
+                     Home Button  5  |-)       (-|  A2 Temp Sensor
+                                 GND |x)       (x| AGND (for ADC VREF)
+                     Start PullUp 6  |-)       (-|  A1 AnalogDpad UP/Down/Toogle
+                     Select PullUp7  |-)       (-|  A0 AnalogDpad Left/Right/Mid
+                     LEDPWM1      8  |-)       (x| RUN
+                     LEDPWM2      9  |-)       (-|  22 LEDRecoil PWM
+                                 GND |x)       (x| GND
+                     RGB Red     10  |-)       (-|  21 Camera SCL
+                     RGB Green   11  |-)       (-|  20 Camera SDA
+                     RGB Blue    12  |-)       (-|  19 Oled SCL
+                     Pump Action 13  |-)       (-|  18 Oled SDA
+                                 GND |x)       (x| GND
+                     Thumb Btn   14  |-)       (-|  17 Rumble Signal
+                     Trigger     15  |-) _|_|_ (-|  16 Solenoid Signal
+*/
+
+
 
     #endif // ARDUINO_BOARD
 
@@ -335,41 +377,8 @@ void SamcoPreferences::PresetCam()
 #endif // ARDUINO_BOARD
 }
 
-#if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
-/*
-String SamcoPreferences::exportToJson() {
-  DynamicJsonDocument doc(1024);
-  
-  doc["apName"] = SamcoPreferences::settings.apName;
-  doc["apPassword"] = SamcoPreferences::settings.apPassword;
-  doc["serverPort"] = SamcoPreferences::settings.serverPort;
-
-  String jsonString;
-  serializeJsonPretty(doc, jsonString);
-  
-  return jsonString;
-}
-
-bool SamcoPreferences::saveJsonToStruct(const String& jsonPayload) {
-  DynamicJsonDocument doc(1024);
-  
-  DeserializationError error = deserializeJson(doc, jsonPayload);
-  if (error) {
-    return false;
-  }
-
-  strlcpy(SamcoPreferences::settings.apName, doc["apName"] | "", sizeof(SamcoPreferences::settings.apName));
-  strlcpy(SamcoPreferences::settings.apPassword, doc["apPassword"] | "", sizeof(SamcoPreferences::settings.apPassword));
-  SamcoPreferences::settings.serverPort = doc["serverPort"] | 80;
-  
-  return true;
-}
-*/
-#endif
-
-
 String  SamcoPreferences::structuresToJson() {
-    // Créer un document JSON dynamique
+    // Crï¿½er un document JSON dynamique
     DynamicJsonDocument doc(2048);
     
     JsonArray profilesJson = doc.createNestedArray("profiles");
@@ -421,20 +430,21 @@ String  SamcoPreferences::structuresToJson() {
             hexColor = "0" + hexColor;
         }
         profileJson["customLEDcolor3"] = "#" + hexColor;
-
         profileJson["ledPWM1Level"] = profile.ledPWM1Level;
         profileJson["ledPWM2Level"] = profile.ledPWM2Level;
         profileJson["ledPWMRecoilFadeDuration"] = profile.ledPWMRecoilFadeDuration;
         
+
         profileJson["controlMode"] = profile.controlMode;
         
         profileJson["rumbleActive"] = profile.rumbleActive;
         profileJson["solenoidActive"] = profile.solenoidActive;
         profileJson["autofireActive"] = profile.autofireActive;
         profileJson["rumbleFF"] = profile.rumbleFF;
+        profileJson["wideScreenMode"] = profile.wideScreenMode;
     }
 
-    // Ajouter le profil sélectionné
+    // Ajouter le profil sï¿½lectionnï¿½
     doc["selectedProfile"] = SamcoPreferences::profiles.selectedProfile;    
 
     // Ajouter les valeurs de la structure TogglesMap_t
@@ -482,23 +492,26 @@ String  SamcoPreferences::structuresToJson() {
     pinsJson["oLedPWMControl2"] = SamcoPreferences::pins.oLedPWMControl2;
     pinsJson["oLedPWMControlRecoil"] = SamcoPreferences::pins.oLedPWMControlRecoil;
 
+    pinsJson["bDpadAnalogicUpDownToggle"] = SamcoPreferences::pins.bDpadAnalogicUpDownToggle;
+    pinsJson["bDpadAnalogicLeftRightMiddle"] = SamcoPreferences::pins.bDpadAnalogicLeftRightMiddle;
+    pinsJson["bDpadAnalogicStart"] = SamcoPreferences::pins.bDpadAnalogicStart;
+    pinsJson["bDpadAnalogicSelect"] = SamcoPreferences::pins.bDpadAnalogicSelect;
+    pinsJson["pNunchuckSDA"] = SamcoPreferences::pins.pNunchuckSDA;
+    pinsJson["pNunchuckSCL"] = SamcoPreferences::pins.pNunchuckSCL;
+    pinsJson["bToggle"] = SamcoPreferences::pins.bToggle;
+    pinsJson["bThumb"] = SamcoPreferences::pins.bThumb;
 
     // Ajouter les valeurs de la structure SettingsMap_t
     JsonObject settingsJson = doc.createNestedObject("settings");
     settingsJson["pauseHoldLength"] = SamcoPreferences::settings.pauseHoldLength;
     settingsJson["customLEDcount"] = SamcoPreferences::settings.customLEDcount;
     settingsJson["customLEDstatic"] = SamcoPreferences::settings.customLEDstatic;
-    
-    settingsJson["ledPWM1_min"] = SamcoPreferences::settings.ledPWM1_min;
-    settingsJson["ledPWM1_max"] = SamcoPreferences::settings.ledPWM1_max;
-    settingsJson["ledPWM2_min"] = SamcoPreferences::settings.ledPWM2_min;
-    settingsJson["ledPWM2_max"] = SamcoPreferences::settings.ledPWM2_max;
+
     settingsJson["ledPWMRecoil_min"] = SamcoPreferences::settings.ledPWMRecoil_min;
     settingsJson["ledPWMRecoil_max"] = SamcoPreferences::settings.ledPWMRecoil_max;
 
     settingsJson["apName"] = SamcoPreferences::settings.apName;
-    settingsJson["apPassword"] = SamcoPreferences::settings.apPassword;
-    settingsJson["serverPort"] = SamcoPreferences::settings.serverPort;    
+    settingsJson["apPassword"] = SamcoPreferences::settings.apPassword; 
     
 
     // Ajouter les valeurs de la structure USBMap_t
@@ -506,31 +519,29 @@ String  SamcoPreferences::structuresToJson() {
     usbJson["deviceName"] = SamcoPreferences::usb.deviceName;
     usbJson["devicePID"] = SamcoPreferences::usb.devicePID;
 
-    // Convertir le document JSON en chaîne
+    // Convertir le document JSON en chaï¿½ne
     String jsonString;
     serializeJsonPretty(doc, jsonString);
     return jsonString;
 }
 
 bool SamcoPreferences::JsonToStructures(const String& jsonString) {
-    // Créer un document JSON dynamique
+    // Crï¿½er un document JSON dynamique
     DynamicJsonDocument doc(2048);
 
-    // Désérialiser la chaîne JSON
+    // Dï¿½sï¿½rialiser la chaï¿½ne JSON
     DeserializationError error = deserializeJson(doc, jsonString);
     if (error) {
-        Serial.println("error");
-        return false; // Erreur de désérialisation
+        return false; // Erreur de dï¿½sï¿½rialisation
     }
-    Serial.println("no error");
     
-    // Récupérer les profils
+    // Rï¿½cupï¿½rer les profils
     JsonArray profilesJson = doc["profiles"];
     if (!profilesJson.isNull()) {
         for (uint8_t i = 0; i < profilesJson.size() && i < SamcoPreferences::profiles.profileCount; ++i) {
             const JsonObject& profileJson = profilesJson[i];
             SamcoPreferences::ProfileData_t& profile = SamcoPreferences::profiles.pProfileData[i];
-            char hexColor[8]; // La chaîne hexadécimale pour la couleur (#RRGGBB)
+            char hexColor[8]; // La chaï¿½ne hexadï¿½cimale pour la couleur (#RRGGBB)
             
             if (profileJson.containsKey("topOffset")) profile.topOffset = profileJson["topOffset"];
             if (profileJson.containsKey("bottomOffset")) profile.bottomOffset = profileJson["bottomOffset"];
@@ -547,10 +558,10 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
             //if (profileJson.containsKey("color")) profile.color = profileJson["color"].as<const char*>();
             if (profileJson.containsKey("color")){
                 const char* colorStr = profileJson["color"].as<const char*>();
-                // Assurez-vous que la chaîne est bien formatée en hex (par exemple #RRGGBB)
+                // Assurez-vous que la chaï¿½ne est bien formatï¿½e en hex (par exemple #RRGGBB)
                 if (colorStr[0] == '#') {
                     uint32_t color;
-                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractère '#' et lisez un hex
+                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractï¿½re '#' et lisez un hex
                     profile.color = color;
                 }
             }
@@ -571,28 +582,28 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
             
             if (profileJson.containsKey("customLEDcolor1")){
                 const char* colorStr = profileJson["customLEDcolor1"].as<const char*>();
-                // Assurez-vous que la chaîne est bien formatée en hex (par exemple #RRGGBB)
+                // Assurez-vous que la chaï¿½ne est bien formatï¿½e en hex (par exemple #RRGGBB)
                 if (colorStr[0] == '#') {
                     uint32_t color;
-                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractère '#' et lisez un hex
+                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractï¿½re '#' et lisez un hex
                     profile.customLEDcolor1 = color;
                 }
             }
             if (profileJson.containsKey("customLEDcolor2")){
                 const char* colorStr = profileJson["customLEDcolor2"].as<const char*>();
-                // Assurez-vous que la chaîne est bien formatée en hex (par exemple #RRGGBB)
+                // Assurez-vous que la chaï¿½ne est bien formatï¿½e en hex (par exemple #RRGGBB)
                 if (colorStr[0] == '#') {
                     uint32_t color;
-                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractère '#' et lisez un hex
+                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractï¿½re '#' et lisez un hex
                     profile.customLEDcolor2 = color;
                 }
             }
             if (profileJson.containsKey("customLEDcolor3")){
                 const char* colorStr = profileJson["customLEDcolor3"].as<const char*>();
-                // Assurez-vous que la chaîne est bien formatée en hex (par exemple #RRGGBB)
+                // Assurez-vous que la chaï¿½ne est bien formatï¿½e en hex (par exemple #RRGGBB)
                 if (colorStr[0] == '#') {
                     uint32_t color;
-                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractère '#' et lisez un hex
+                    sscanf(colorStr + 1, "%6x", &color); // Ignorez le caractï¿½re '#' et lisez un hex
                     profile.customLEDcolor3 = color;
                 }
             }            
@@ -601,17 +612,46 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
             if (profileJson.containsKey("ledPWM2Level")) profile.ledPWM2Level = profileJson["ledPWM2Level"];
             if (profileJson.containsKey("ledPWMRecoilFadeDuration")) profile.ledPWMRecoilFadeDuration = profileJson["ledPWMRecoilFadeDuration"];
             
-            if (profileJson.containsKey("controlMode")) profile.controlMode = profileJson["controlMode"];    
+			/*
+			if (profileJson.containsKey("controlMode") && int.TryParse(profileJson["controlMode"].ToString(), out int tmpNumericValue) && tmpNumericValue >= 0 && tmpNumericValue <= 2){
+				//profile.controlMode = profileJson["controlMode"];
+				SamcoPreferences::SetControlMode(tmpNumericValue);
+			}
+			*/
+			if (profileJson.containsKey("controlMode") && profileJson["controlMode"].is<ControlMode_e>()) {
+				ControlMode_e value = profileJson["controlMode"].as<ControlMode_e>();
+				if (value >= 0 && value <= 2) {
+					profile.controlMode = profileJson["controlMode"];
+				}
+			}		
+			//TODO : Verifs supplementaire a faire	
+			
             
             if (profileJson.containsKey("rumbleActive")) profile.rumbleActive = profileJson["rumbleActive"];
             if (profileJson.containsKey("solenoidActive")) profile.solenoidActive = profileJson["solenoidActive"];
             if (profileJson.containsKey("autofireActive")) profile.autofireActive = profileJson["autofireActive"];
             if (profileJson.containsKey("rumbleFF")) profile.rumbleFF = profileJson["rumbleFF"];
+            if (profileJson.containsKey("wideScreenMode")) profile.wideScreenMode = profileJson["wideScreenMode"];
+
+
+            if(profile.rightOffset >= 32768 || profile.bottomOffset >= 32768 ||
+            profile.topOffset >= 32768 || profile.leftOffset >= 32768) {
+                profile.topOffset = 0;
+                profile.bottomOffset = 0;
+                profile.leftOffset = 0;
+                profile.rightOffset = 0;
+            }
+        
+            if(profile.irSensitivity > 2) {
+                profile.irSensitivity = 0;
+            }      
+			
         }
     }
 
-    // Profil sélectionné
+    // Profil sï¿½lectionnï¿½
     if (doc.containsKey("selectedProfile")) {
+
         SamcoPreferences::profiles.selectedProfile = doc["selectedProfile"];
     }
 
@@ -665,8 +705,16 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
         if (pinsJson.containsKey("aTMP36")) SamcoPreferences::pins.aTMP36 = pinsJson["aTMP36"];
         if (pinsJson.containsKey("oLedPWMControl1")) SamcoPreferences::pins.oLedPWMControl1 = pinsJson["oLedPWMControl1"];
         if (pinsJson.containsKey("oLedPWMControl2")) SamcoPreferences::pins.oLedPWMControl2 = pinsJson["oLedPWMControl2"];
-        if (pinsJson.containsKey("oLedPWMControlRecoil")) SamcoPreferences::pins.oLedPWMControlRecoil = pinsJson["oLedPWMControlRecoil"];        
-        
+        if (pinsJson.containsKey("oLedPWMControlRecoil")) SamcoPreferences::pins.oLedPWMControlRecoil = pinsJson["oLedPWMControlRecoil"]; 
+
+        if (pinsJson.containsKey("bDpadAnalogicUpDownToggle")) SamcoPreferences::pins.bDpadAnalogicUpDownToggle = pinsJson["bDpadAnalogicUpDownToggle"];   
+        if (pinsJson.containsKey("bDpadAnalogicLeftRightMiddle")) SamcoPreferences::pins.bDpadAnalogicLeftRightMiddle = pinsJson["bDpadAnalogicLeftRightMiddle"];   
+        if (pinsJson.containsKey("bDpadAnalogicStart")) SamcoPreferences::pins.bDpadAnalogicStart = pinsJson["bDpadAnalogicStart"];   
+        if (pinsJson.containsKey("bDpadAnalogicSelect")) SamcoPreferences::pins.bDpadAnalogicSelect = pinsJson["bDpadAnalogicSelect"];   
+        if (pinsJson.containsKey("pNunchuckSDA")) SamcoPreferences::pins.pNunchuckSDA = pinsJson["pNunchuckSDA"];   
+        if (pinsJson.containsKey("pNunchuckSCL")) SamcoPreferences::pins.pNunchuckSCL = pinsJson["pNunchuckSCL"];          
+        if (pinsJson.containsKey("bToggle")) SamcoPreferences::pins.bToggle = pinsJson["bToggle"];   
+        if (pinsJson.containsKey("bThumb")) SamcoPreferences::pins.bThumb = pinsJson["bThumb"];          
     }
 
     // Structure SettingsMap_t
@@ -676,12 +724,8 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
         if (settingsJson.containsKey("customLEDcount")) SamcoPreferences::settings.customLEDcount = settingsJson["customLEDcount"];
         if (settingsJson.containsKey("customLEDstatic")) SamcoPreferences::settings.customLEDstatic = settingsJson["customLEDstatic"];
         
-        if (settingsJson.containsKey("ledPWM1_min")) SamcoPreferences::settings.ledPWM1_min = settingsJson["ledPWM1_min"];
-        if (settingsJson.containsKey("ledPWM1_max")) SamcoPreferences::settings.ledPWM1_max = settingsJson["ledPWM1_max"];
-        if (settingsJson.containsKey("ledPWM2_min")) SamcoPreferences::settings.ledPWM2_min = settingsJson["ledPWM2_min"];
-        if (settingsJson.containsKey("ledPWM2_max")) SamcoPreferences::settings.ledPWM2_max = settingsJson["ledPWM2_max"];
-        if (settingsJson.containsKey("ledPWMRecoil_min")) SamcoPreferences::settings.ledPWM1_min = settingsJson["ledPWMRecoil_min"];
-        if (settingsJson.containsKey("ledPWMRecoil_max")) SamcoPreferences::settings.ledPWM1_max = settingsJson["ledPWMRecoil_max"];
+        if (settingsJson.containsKey("ledPWMRecoil_min")) SamcoPreferences::settings.ledPWMRecoil_min = settingsJson["ledPWMRecoil_min"];
+        if (settingsJson.containsKey("ledPWMRecoil_max")) SamcoPreferences::settings.ledPWMRecoil_max = settingsJson["ledPWMRecoil_max"];
         
         if (settingsJson.containsKey("apName")) {
             strncpy(SamcoPreferences::settings.apName, settingsJson["apName"].as<const char*>(), sizeof(SamcoPreferences::settings.apName) - 1);
@@ -691,7 +735,6 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
             strncpy(SamcoPreferences::settings.apPassword, settingsJson["apPassword"].as<const char*>(), sizeof(SamcoPreferences::settings.apPassword) - 1);
             SamcoPreferences::settings.apPassword[sizeof(SamcoPreferences::settings.apPassword) - 1] = '\0';
         }
-        if (settingsJson.containsKey("serverPort")) SamcoPreferences::settings.serverPort = settingsJson["serverPort"];
     }
 
     // Structure USBMap_t
@@ -704,5 +747,5 @@ bool SamcoPreferences::JsonToStructures(const String& jsonString) {
         if (usbJson.containsKey("devicePID")) SamcoPreferences::usb.devicePID = usbJson["devicePID"];
     }
 
-    return true; // Succès
+    return true; // Succï¿½s
 }

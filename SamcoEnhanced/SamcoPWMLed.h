@@ -33,9 +33,9 @@ public:
     static uint32_t lastUpdateTime;
     
     static void PwmLedInit();
-    static void SetLedPWM1Level(uint8_t level = -1);
-    static void SetLedPWM2Level(uint8_t level = -1);
-    static uint8_t PwmValueFromLevel(uint8_t level, uint8_t min, uint8_t max);
+    static void PwmLedSleep();
+    static void SetLedPWM1Level(int level = -1);
+    static void SetLedPWM2Level(int level = -1);
     static void StartRecoilLed();
     static void SetRecoilState(SamcoPWMLed::LedPWMRecoilState newState);
     static void StopRecoilLed();

@@ -60,6 +60,7 @@ public:
         uint8_t* pArrDebounceCount;     ///< Pointer to button debounce counters.
     } Data_t;
     
+    static bool useAnalogDpad;
     /// @brief Constructor.
     LightgunButtons(Data_t data, unsigned int count);
 

@@ -17,6 +17,7 @@
 #include <OpenFIREBoard.h>
 #include <stdint.h>
 #include "SharedStaticData.h"
+#include "SamcoDisplay.h"
 
 #if defined(ARDUINO_RASPBERRY_PI_PICO_W)
     #include <ArduinoJson.h>
@@ -48,6 +49,7 @@ public:
         int autofireActive = -1;    
         int rumbleFF = -1;
         int controlMode = -1;
+        int wideScreenMode = -1;
     } __attribute__ ((packed)) TemporarySerialSettings_t;
     
     static TemporarySerialSettings_t temporarySerialSettings;
@@ -83,9 +85,11 @@ public:
     static bool GetAutofireActive(){ return SamcoPreferences::temporarySerialSettings.autofireActive != -1 ? SamcoPreferences::temporarySerialSettings.autofireActive : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive; };
     static bool GetRumbleFF() {return SamcoPreferences::temporarySerialSettings.rumbleFF != -1 ? SamcoPreferences::temporarySerialSettings.rumbleFF : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF; };
     static uint8_t GetControlMode() {return SamcoPreferences::temporarySerialSettings.controlMode != -1 ? SamcoPreferences::temporarySerialSettings.controlMode : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].controlMode; };
+    static bool GetWideScreenMode() {return SamcoPreferences::temporarySerialSettings.wideScreenMode != -1 ? SamcoPreferences::temporarySerialSettings.wideScreenMode : SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].wideScreenMode; };
         
         
     static void SetRumbleActive(bool value, bool temporary = false) {
+		if(temporary && SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive == value) temporary = false;
         if (temporary) {
 			if(GetRumbleActive() == value) return;
             SamcoPreferences::temporarySerialSettings.rumbleActive = value;
@@ -93,9 +97,12 @@ public:
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleActive = value;
             SamcoPreferences::temporarySerialSettings.rumbleActive = -1;
         }
+		#ifdef USES_DISPLAY
+			ExtDisplay::setRumbleActive(value,temporary);
+		#endif // USES_DISPLAY
     }
     static void SetSolenoidActive(bool value, bool temporary = false) {
-        
+		if(temporary && SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive == value) temporary = false;
         if (temporary) {
 			if(GetSolenoidActive() == value) return;
             SamcoPreferences::temporarySerialSettings.solenoidActive = value;
@@ -103,9 +110,12 @@ public:
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].solenoidActive = value;
             SamcoPreferences::temporarySerialSettings.solenoidActive = -1;
         }
+		#ifdef USES_DISPLAY
+			ExtDisplay::setSolenoidActive(value,temporary);
+		#endif // USES_DISPLAY
     }
     static void SetAutofireActive(bool value, bool temporary = false) {
-        
+		if(temporary && SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive == value) temporary = false;
         if (temporary) {
 			if(GetAutofireActive() == value) return;
             SamcoPreferences::temporarySerialSettings.autofireActive = value;
@@ -113,21 +123,27 @@ public:
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].autofireActive = value;
             SamcoPreferences::temporarySerialSettings.autofireActive = -1;
         }
+		#ifdef USES_DISPLAY
+			ExtDisplay::setAutofireActive(value,temporary);
+		#endif // USES_DISPLAY
     }
     static void SetRumbleFF(bool value, bool temporary = false) {
-        
+		if(temporary && SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF == value) temporary = false;
         if (temporary) {
 			if(GetRumbleFF() == value) return;
-            SamcoPreferences::temporarySerialSettings.rumbleFF = value;
+			SamcoPreferences::temporarySerialSettings.rumbleFF = value;
         } else {
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].rumbleFF = value;
             SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
         }
+		#ifdef USES_DISPLAY
+			ExtDisplay::setRumbleFF(value,temporary);
+		#endif // USES_DISPLAY
     }
     
     static void SetControlMode(ControlMode_e value, bool temporary = false) {
-        SharedStaticData::controlMode = value;    
-
+		if(temporary && SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].controlMode == value) temporary = false;
+        SharedStaticData::controlMode = value; 
         if (temporary) {
 			if(GetControlMode() == value) return;
             SamcoPreferences::temporarySerialSettings.controlMode = value;
@@ -135,7 +151,24 @@ public:
             SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].controlMode = value;
             SamcoPreferences::temporarySerialSettings.controlMode = -1;
         }
+		#ifdef USES_DISPLAY
+			ExtDisplay::setControlMode(value,temporary);
+		#endif // USES_DISPLAY
     }
+
+    static void SetWideScreenMode(bool value, bool temporary = false) {
+		if(temporary && SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].wideScreenMode == value) temporary = false;
+        if (temporary) {
+			if(GetWideScreenMode() == value) return;
+            SamcoPreferences::temporarySerialSettings.wideScreenMode = value;
+        } else {
+            SamcoPreferences::profiles.pProfileData[SamcoPreferences::profiles.selectedProfile].wideScreenMode = value;
+            SamcoPreferences::temporarySerialSettings.wideScreenMode = -1;
+        }
+		#ifdef USES_DISPLAY
+			ExtDisplay::setWideScreenMode(value,temporary);
+		#endif // USES_DISPLAY
+    }    
       
     //Used when pins are not set
     static void DisableRumbleActive(){
@@ -153,7 +186,12 @@ public:
     static void DisableRumbleFF(){
         for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].rumbleFF = false;}
         SamcoPreferences::temporarySerialSettings.rumbleFF = -1;
-    }        
+    }
+    static void DisableWideScreenMode(){
+        for(unsigned int i = 0; i < SamcoPreferences::profiles.profileCount; ++i) {SamcoPreferences::profiles.pProfileData[i].wideScreenMode = false;}
+        SamcoPreferences::temporarySerialSettings.wideScreenMode = -1;
+    }  
+
     
         
 
@@ -195,7 +233,8 @@ public:
         bool rumbleActive = true;       // Are we allowed to do rumble?
         bool solenoidActive = true;     // Are we allowed to use a solenoid?
         bool autofireActive = false;    // Is autofire enabled?
-        bool rumbleFF = false;          // Rumble force-feedback, instead of Solenoid    
+        bool rumbleFF = false;          // Rumble force-feedback, instead of Solenoid
+        bool wideScreenMode = true;   
         char name[16];               // Profile display name        
         
     } __attribute__ ((packed)) ProfileData_t;
@@ -275,7 +314,15 @@ public:
         Pin_AnalogTMP,
         Pin_LedPWMControl1,
         Pin_LedPWMControl2,
-        Pin_LedPWMControlRecoil
+        Pin_LedPWMControlRecoil,
+        Pin_DpadAnalogicUpDown,
+        Pin_DpadAnalogicLeftRightMiddle,
+        Pin_DpadAnalogicStart,
+        Pin_DpadAnalogicSelect,
+        Pin_NunchuckSDA,
+        Pin_NunchuckSCL,
+        Pin_Toggle,
+        Pin_Thumb   
     };
 
     typedef struct PinsMap_s {
@@ -313,6 +360,14 @@ public:
         int8_t oLedPWMControl1 = -1;       // PWM Led driver control 1
         int8_t oLedPWMControl2 = -1;    // PWM Led driver control 2
         int8_t oLedPWMControlRecoil = -1;//PWM Led driver control on Recoil 
+        int8_t bDpadAnalogicUpDownToggle = -1;
+        int8_t bDpadAnalogicLeftRightMiddle = -1;
+        int8_t bDpadAnalogicStart = -1;
+        int8_t bDpadAnalogicSelect = -1;
+        int8_t pNunchuckSDA = -1;
+        int8_t pNunchuckSCL = -1;
+        int8_t bToggle = -1;
+        int8_t bThumb = -1;
     } PinsMap_t;
 
     static PinsMap_t pins;
@@ -345,15 +400,8 @@ public:
         //uint32_t customLEDcolor1 = 0xFF0000; // DEPRECIATED, Now on the ExtraProfile.
         //uint32_t customLEDcolor2 = 0x00FF00; // DEPRECIATED, Now on the ExtraProfile.
         //uint32_t customLEDcolor3 = 0x0000FF; // DEPRECIATED, Now on the ExtraProfile.
-        
-        uint8_t ledPWM1_min = 0;
-        uint8_t ledPWM1_max = 0;
-        uint8_t ledPWM2_min = 0;
-        uint8_t ledPWM2_max = 0;
         uint8_t ledPWMRecoil_min = 0;
-        uint8_t ledPWMRecoil_max = 0;
-        
-        int serverPort = 80;
+        uint8_t ledPWMRecoil_max = 255;
         char apName[50];
         char apPassword[50];         
     } SettingsMap_t;
