@@ -40,6 +40,7 @@
     unsigned long previousWifiConnectStep = 0;
     int wifiConnectStep = 0;
     bool connected = false;
+    bool forceAP = false;
     AsyncWebServer server(80);
 #endif
 
@@ -737,7 +738,7 @@ void setup() {
     OpenFIREper.deinit(0);
     
     #if defined(ARDUINO_RASPBERRY_PI_PICO_W) && defined(USES_WEBSERVER)
-        if(String(SamcoPreferences::settings.apName) == ""){
+        if(String(SamcoPreferences::settings.apName) == "" || forceAP){
             wifiConnectStep = 90;    
         }
         else{
@@ -745,6 +746,31 @@ void setup() {
             wifiConnectStep=1;
         }
     #endif
+
+
+    //Because, let say someone is dumb enought to set those pin at -1
+    uint8_t default_trigger = 15;
+    uint8_t default_gunA = 0;
+    #ifdef ARDUINO_ADAFRUIT_ITSYBITSY_RP2040
+        default_trigger = 6;
+        default_gunA = 27;
+    #elifdef ARDUINO_ADAFRUIT_KB2040_RP2040
+        default_trigger = A2;
+        default_gunA = A3;
+    #elifdef ARDUINO_NANO_RP2040_CONNECT
+        default_trigger = 15;
+        default_gunA = 0;
+    #elifdef ARDUINO_WAVESHARE_RP2040_ZERO
+        default_trigger = 0;
+        default_gunA = 1;
+    #elif defined(ARDUINO_RASPBERRY_PI_PICO) || defined(ARDUINO_RASPBERRY_PI_PICO_W)
+        default_trigger = 15;
+        default_gunA = 0;
+    #endif // ARDUINO_BOARD
+    if(!digitalRead(SamcoPreferences::pins.bTrigger >= 0 ? SamcoPreferences::pins.bTrigger : default_trigger) && !digitalRead(SamcoPreferences::pins.bGunA >= 0 ? SamcoPreferences::pins.bGunA : default_gunA)) {
+            reset_usb_boot(1, 0);
+            while (1);
+    } 
 
     //DISPLAYTODOREWRITE
     #ifdef USES_DISPLAY
@@ -755,7 +781,9 @@ void setup() {
         pinMode(SamcoPreferences::pins.pNunchuckSCL, INPUT_PULLUP);
         pinMode(SamcoPreferences::pins.pNunchuckSDA, INPUT_PULLUP);
         #ifdef USES_DISPLAY
-        Wire1.end();
+        if(OLED.displayValid) Wire1.end();
+        #else
+        nunchuckActif=true;
         #endif // USES_DISPLAY    
         Wire1.setSDA(SamcoPreferences::pins.pNunchuckSDA);
         Wire1.setSCL(SamcoPreferences::pins.pNunchuckSCL);
@@ -820,10 +848,12 @@ void setup() {
             profileData[selectedProfile].rightOffset == 0)) { SetMode(GunMode_Calibration); }
             else { SetMode(GunMode_Run); }
     } else {
-        /* In case someone wants to implement functionality when user holds trigger on boot, here's the former "mister mode" template c:
+        
+        //In case someone wants to implement functionality when user holds trigger on boot, here's the former "mister mode" template c:
         if(SamcoPreferences::pins.bTrigger >= 0 && !digitalRead(SamcoPreferences::pins.bTrigger)) {
-            
-        }*/
+            forceAP = true;
+        }
+
         // this will turn off the DotStar/RGB LED and ensure proper transition to Run
         SetMode(GunMode_Run);
     }
@@ -1109,7 +1139,7 @@ void loop1()
             }
 
             if (!connected) {
-                if(String(SamcoPreferences::settings.apName) == ""){
+                if(String(SamcoPreferences::settings.apName) == "" || forceAP){
                     WiFi.mode(WIFI_OFF);
                     WiFi.mode(WIFI_AP);
                     
@@ -1153,6 +1183,69 @@ void loop1()
             // Serveur web
             server.on("/", HTTP_GET, handleRoot);
             
+// Nouvelle méthode pour /save
+server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
+    // Variable pour stocker la réponse
+    int code = 200;
+    String txtResult = "Configuration mise à jour avec succès.";
+    String responseJson;
+
+    Serial.println("hasRequest");
+
+    // On lit le corps de la requête (JSON brut)
+    if (request->hasParam("json", true)) {
+        String jsonPayload = request->getParam("json", true)->value();
+        Serial.println("PAYLOAD="+jsonPayload);
+
+        // Vérification et traitement du JSON
+        if (!SamcoPreferences::JsonToStructures(jsonPayload)) {
+            code = 400;
+            txtResult = "Erreur : JSON invalide.";
+        } else {
+            // Sauvegarde des préférences et mises à jour
+            SamcoPreferences::SaveProfiles();
+            SelectCalProfile(SamcoPreferences::profiles.selectedProfile);
+            AbsMouse5.releaseAll();
+            Keyboard.releaseAll();
+            Gamepad16.releaseAll();
+
+            // Gestion de l'affichage
+            #ifdef USES_DISPLAY
+            if (!serialMode && gunMode == GunMode_Run) {
+                OLED.ScreenModeChange(ExtDisplay::Screen_Normal);
+            } else if (serialMode && gunMode == GunMode_Run &&
+                       ExtDisplay::serialDisplayValue > (int)ExtDisplay::ScreenSerial_None &&
+                       ExtDisplay::serialDisplayValue < (int)ExtDisplay::ScreenSerial_Both) {
+                OLED.ScreenModeChange(ExtDisplay::Screen_Mamehook_Single);
+            }
+            #endif // USES_DISPLAY
+        }
+    } else {
+        // Pas de JSON dans la requête
+        code = 400;
+        txtResult = "Erreur : aucun JSON reçu.";
+    }
+
+    // Construire la réponse JSON
+    DynamicJsonDocument doc(1024);
+    doc["code"] = code;
+    doc["message"] = txtResult;
+
+    // Ajouter le JSON actuel (data) si succès
+    if (code == 200) {
+        String jsonString = SamcoPreferences::structuresToJson();
+        doc["data"] = jsonString;
+    }
+
+    // Convertir en String
+    serializeJson(doc, responseJson);
+
+    // Envoyer la réponse au client
+    request->send(code, "application/json", responseJson);
+});
+
+
+            /*
             // Serve la page avec une grande zone de texte contenant le JSON
             server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
 
@@ -1192,6 +1285,9 @@ void loop1()
 
 
                 String jsonString = SamcoPreferences::structuresToJson();
+
+                
+                
                 String html = R"(
                   <html>
                   <head>
@@ -1207,9 +1303,12 @@ void loop1()
                   </body>
                   </html>
                 )";  
+                
                   request->send(code, "text/html", html);
 
-            });                    
+            });  
+
+            */                  
             server.begin();
             wifiConnectStep = 100;   
         }
@@ -1352,7 +1451,7 @@ void loop1()
                     nunchuckFailCount = 0;
                 }
             }
-            if (nunchuckPlugged == false && OLED.displayValid && nunchuckActif && now > nextStepNunchuck) {
+            if (nunchuckPlugged == false && nunchuckActif && now > nextStepNunchuck) {
                 if (nunchuckStepWrite) {
                     uint8_t reg1[2] = {
                         0xF0,
@@ -1473,22 +1572,343 @@ void checkWiFiConnection() {
 void handleRoot(AsyncWebServerRequest *request) {
   String jsonString = SamcoPreferences::structuresToJson();
   
-  String html = R"(
-    <html>
-    <head>
-        <title>Config</title>
-    </head>
-    <body>
-        <h1>Edit Config</h1>
-        <form action="/save" method="POST">
-            <textarea name="jsonData" rows="15" cols="50">)" + jsonString + R"(
-            </textarea><br><br>
-            <input type="submit" value="Sauvegarder">
-        </form>
-    </body>
-    </html>
-  )";
+
+String html = R"(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuration OpenFire</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 20px;
+      padding: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #0056b3;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .large-textbox {
+      width: 100%;
+      height: 70vh;
+      max-width: 800px;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: none;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 8px 16px;
+      font-size: 14px;
+      color: #fff;
+      background-color: #0056b3;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #003f7f;
+    }
+  </style>
   
+  <script id="json-data" type="application/json">
+)" + jsonString + R"(
+  </script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const scriptTag = document.getElementById('json-data');
+    const jsonData = JSON.parse(scriptTag.innerText);
+
+    // Liste des URLs des CDNs
+    const cdnUrls = [
+      'https://cdn.jsdelivr.net/npm/vanilla-jsoneditor/standalone.js',
+      'https://unpkg.com/vanilla-jsoneditor/standalone.js',
+      'http://virtunys.free.fr/jsoneditor.js'
+    ];
+
+    let moduleLoaded = false;
+
+    for (const url of cdnUrls) {
+      try {
+        console.log(`Tentative de chargement du module depuis ${url}`);
+        const { createJSONEditor } = await import(url);
+
+        // Si le chargement réussit, initialiser l'éditeur JSON
+        moduleLoaded = true;
+
+        let content = {
+          text: undefined,
+          json: jsonData
+        };
+
+        const editor = createJSONEditor({
+          target: document.getElementById('jsoneditor'),
+          props: {
+            content,
+            onChange: (updatedContent) => {
+              content = updatedContent;
+            },
+            mainMenuBar: false,
+            statusBar: false,
+            onRenderContextMenu: () => false,
+          },
+        });
+        window.editor = editor;
+
+        document.getElementById('save-button').addEventListener('click', async () => {
+          try {
+            const response = await fetch('/save', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: `json=${encodeURIComponent(JSON.stringify(editor.get().json))}`,
+            });
+
+            if (!response.ok) {
+              throw new Error(`Erreur du serveur : ${response.status}`);
+            }
+
+            const responseData = await response.json();
+
+            if (responseData.code === 200) {
+              editor.update({
+                text: responseData.data,
+                json: undefined,
+              });
+              alert('Configuration mise à jour avec succès.');
+            } else {
+              alert('Erreur lors de la mise à jour : ' + responseData.message);
+            }
+          } catch (error) {
+            alert('Erreur lors de l’envoi des données : ' + error.message);
+          }
+        });
+
+        break; // Arrêter la boucle si le chargement réussit
+      } catch (error) {
+        console.warn(`Échec du chargement depuis ${url}: ${error.message}`);
+      }
+    }
+
+	if (!moduleLoaded) {
+	  // Si aucun CDN ne fonctionne, activer le mode fallback
+	  console.warn('Tous les CDNs ont échoué. Utilisation du mode fallback.');
+
+	  const container = document.querySelector('.container');
+	  container.innerHTML = `
+		<textarea class="large-textbox" id="fallback-textarea">${JSON.stringify(jsonData, null, 2)}</textarea>
+		<button id="fallback-save-button">Valider les changements</button>
+	  `;
+
+	  document.getElementById('fallback-save-button').addEventListener('click', async () => {
+		const textareaValue = document.getElementById('fallback-textarea').value;
+
+		try {
+		  const response = await fetch('/save', {
+			method: 'POST',
+			headers: {
+			  'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: `json=${encodeURIComponent(textareaValue)}`,
+		  });
+
+		  if (!response.ok) {
+			throw new Error(`Erreur du serveur : ${response.status}`);
+		  }
+
+		  const responseData = await response.json();
+
+		  if (responseData.code === 200) {
+			// Mettre à jour la textarea avec les nouvelles données
+			document.getElementById('fallback-textarea').value = JSON.stringify(responseData.data, null, 2);
+			alert('Configuration mise à jour avec succès.');
+		  } else {
+			alert('Erreur lors de la mise à jour : ' + responseData.message);
+		  }
+		} catch (error) {
+		  alert('Erreur lors de l’envoi des données : ' + error.message);
+		}
+	  });
+	}
+  });
+</script>
+</head>
+<body>
+  <h1>Configuration OpenFire</h1>
+
+  <div class="container">
+    <div class="large-textbox" id="jsoneditor"></div>
+    <button id="save-button">Save Changes</button>
+  </div>
+</body>
+</html>
+)";
+
+
+/*
+                String html = R"(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raspberry Pi Pico Configuration</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 20px;
+      padding: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #0056b3;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .large-textbox {
+      width: 100%;
+      height: 70vh;
+      max-width: 800px;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: none;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 8px 16px;
+      font-size: 14px;
+      color: #fff;
+      background-color: #0056b3;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #003f7f;
+    }
+  </style>
+  
+  <script id="json-data" type="application/json">
+)" + jsonString + R"(
+  </script>
+  <script type="module">
+    import { createJSONEditor } from 'https://cdn.jsdelivr.net/npm/vanilla-jsoneditor/standalone.js';
+
+    const scriptTag = document.getElementById('json-data');
+    const jsonData = JSON.parse(scriptTag.innerText);
+
+    let content = {
+      text: undefined,
+      json: jsonData
+    };
+
+    const editor = createJSONEditor({
+      target: document.getElementById('jsoneditor'),
+      props: {
+        content,
+        onChange: (updatedContent) => {
+          content = updatedContent;
+        },
+        mainMenuBar: false,
+        statusBar: false,
+        onRenderContextMenu: () => false,
+      },
+    });
+    window.editor = editor;
+
+    document.getElementById('save-button').addEventListener('click', async () => {
+      try {
+        // Envoyer le JSON au serveur
+        const response = await fetch('/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded', // Modifié pour envoyer des données comme un formulaire
+        },
+        body: `json=${encodeURIComponent(JSON.stringify(editor.get().json))}`, // Ajout du paramètre POST nommé "json"
+        });
+
+        // Vérifier la réponse
+        if (!response.ok) {
+          throw new Error(`Erreur du serveur : ${response.status}`);
+        }
+
+        const responseData = await response.json();
+
+        // Mettre à jour l'éditeur avec les nouvelles données
+        if (responseData.code === 200) {
+          editor.update({
+            text: undefined,
+            json: responseData.data,
+          });
+          alert('Configuration mise à jour avec succès.');
+        } else {
+          alert('Erreur lors de la mise à jour : ' + responseData.message);
+        }
+      } catch (error) {
+        alert('Erreur lors de l’envoi des données : ' + error.message);
+      }
+    });
+  </script>
+</head>
+<body>
+  <h1>Configuration du Raspberry Pi Pico</h1>
+
+  <div class="container">
+    <div class="large-textbox" id="jsoneditor"></div>
+    <button id="save-button">Valider les changements</button>
+  </div>
+</body>
+</html> 
+                )";
+*/
+
   request->send(200, "text/html", html);
 }
 #endif
@@ -1498,11 +1918,76 @@ void handleRoot(AsyncWebServerRequest *request) {
 // splits off into subsequent ExecModes depending on circumstances
 void loop()
 {
+    /*
+    if(forceAP) {
+            Serial.println("forcereboot");
+            reset_usb_boot(1, 0);
+            while (1){
+                sleep_ms(100);
+            } // Attendre que le watchdog agisse
+    }
+    */
 	if(isSleepMode){
         sleep_ms(1000);
         return;
     }
 	
+    #ifdef USES_ANALOGDPAD
+        //DpadAnalog
+        unsigned long currentTimeAnalogDpad = millis();
+        if (currentTimeAnalogDpad - lastReadDpadAnalog >= 33) {
+            lastReadDpadAnalog = currentTimeAnalogDpad;
+
+            if(SamcoPreferences::pins.bDpadAnalogicLeftRightMiddle >= 0){
+                int value1 = analogRead(SamcoPreferences::pins.bDpadAnalogicLeftRightMiddle);
+                if(value1 >3100 && value1 < 4000){
+                    SharedStaticData::analogDpadLeftState = 2;
+                    SharedStaticData::analogDpadRightState = SharedStaticData::analogDpadRightState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadMidState = SharedStaticData::analogDpadMidState == 0 ? 0 : 1;
+                }
+                else if(value1 > 2300 && value1 < 3000){
+                    SharedStaticData::analogDpadLeftState = SharedStaticData::analogDpadLeftState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadRightState = 2;
+                    SharedStaticData::analogDpadMidState = SharedStaticData::analogDpadMidState == 0 ? 0 : 1;                
+                }            
+                else if(value1 > 1500 && value1 < 2200){
+                    SharedStaticData::analogDpadLeftState = SharedStaticData::analogDpadLeftState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadRightState = SharedStaticData::analogDpadRightState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadMidState = 2;                
+                }
+                else{
+                    SharedStaticData::analogDpadLeftState = SharedStaticData::analogDpadLeftState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadRightState = SharedStaticData::analogDpadRightState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadMidState = SharedStaticData::analogDpadMidState == 0 ? 0 : 1;                
+                }
+            }
+
+            if(SamcoPreferences::pins.bDpadAnalogicUpDownToggle >= 0){
+                int value2 = analogRead(SamcoPreferences::pins.bDpadAnalogicUpDownToggle);
+                if(value2 >3100 && value2 < 4000){
+                    SharedStaticData::analogDpadUpState = 2;
+                    SharedStaticData::analogDpadDownState = SharedStaticData::analogDpadDownState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadToggleState = SharedStaticData::analogDpadToggleState == 0 ? 0 : 1; 
+                }
+                else if(value2 > 2300 && value2 < 3000){
+                    SharedStaticData::analogDpadUpState = SharedStaticData::analogDpadUpState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadDownState = 2;
+                    SharedStaticData::analogDpadToggleState = SharedStaticData::analogDpadToggleState == 0 ? 0 : 1;                 
+                }
+                else if(value2 > 1500 && value2 < 2200){
+                    SharedStaticData::analogDpadUpState = SharedStaticData::analogDpadUpState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadDownState = SharedStaticData::analogDpadDownState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadToggleState = 2;                
+                }
+                else{
+                    SharedStaticData::analogDpadUpState = SharedStaticData::analogDpadUpState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadDownState = SharedStaticData::analogDpadDownState == 0 ? 0 : 1;
+                    SharedStaticData::analogDpadToggleState = SharedStaticData::analogDpadToggleState == 0 ? 0 : 1;  
+                }
+            }
+        }    
+    #endif
+
     // poll/update button states with 1ms interval so debounce mask is more effective
     buttons.Poll(1);
     buttons.Repeat();
@@ -1525,18 +2010,31 @@ void loop()
         if(Serial.available()) { SerialProcessing(); }
     #endif // MAMEHOOKER
 
+
+
     switch(gunMode) {
         case GunMode_Pause:
-            if(buttons.pressedReleased == BtnMask_A) {
+            if(buttons.pressedReleased>0) Serial.println(buttons.pressedReleased);
+            if(buttons.pressedReleased == BtnMask_A || buttons.pressedReleased == BtnMask_Right) {
                 //SetPauseModeSelection(false);
                     #ifdef USES_DISPLAY
                         OLED.SelectPauseItemNext();
                     #endif // USES_DISPLAY	
             }
-            if(buttons.pressedReleased == BtnMask_B) {
+            if(buttons.pressedReleased == BtnMask_B || buttons.pressedReleased == BtnMask_Left) {
                 //SetPauseModeSelection(false);
                     #ifdef USES_DISPLAY
                         OLED.SelectPauseItemPrevious();
+                    #endif // USES_DISPLAY	
+            }
+            if(buttons.pressedReleased == BtnMask_B || buttons.pressedReleased == BtnMask_Up) {
+                    #ifdef USES_DISPLAY
+                        OLED.SelectPauseItemUp();
+                    #endif // USES_DISPLAY	
+            }
+            if(buttons.pressedReleased == BtnMask_B || buttons.pressedReleased == BtnMask_Down) {
+                    #ifdef USES_DISPLAY
+                        OLED.SelectPauseItemDown();
                     #endif // USES_DISPLAY	
             }
             if(buttons.pressedReleased == BtnMask_Trigger) {

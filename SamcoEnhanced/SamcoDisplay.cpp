@@ -789,11 +789,37 @@ void ExtDisplay::PauseMenuIconPosition(int itemNum, int &x, int &y) {
 }
 
 void ExtDisplay::SelectPauseItemNext(){
-	ExtDisplay::SelectPauseItem((ExtDisplay::PauseItem_e)((int)selectedPauseItem+1));
+  int nextItem = (int)selectedPauseItem+1;
+  if(nextItem>11 & nextItem<15) nextItem = 15;
+	ExtDisplay::SelectPauseItem((ExtDisplay::PauseItem_e)(nextItem));
 }
 
 void ExtDisplay::SelectPauseItemPrevious(){
-	ExtDisplay::SelectPauseItem((ExtDisplay::PauseItem_e)((int)selectedPauseItem-1));
+  int nextItem = (int)selectedPauseItem-1;
+  if(nextItem<15 && nextItem>11) nextItem = 11;
+
+	ExtDisplay::SelectPauseItem((ExtDisplay::PauseItem_e)(nextItem));
+}
+
+void ExtDisplay::SelectPauseItemUp(){
+  int nextItem = (int)selectedPauseItem-5;
+  if(nextItem<PauseItem_Profile) nextItem = PauseItem_Save + nextItem;
+  if(nextItem>11 & nextItem<15){
+    nextItem -= 5;
+    if(nextItem<PauseItem_Profile) nextItem = PauseItem_Save + nextItem;
+  }
+
+	ExtDisplay::SelectPauseItem((ExtDisplay::PauseItem_e)(nextItem));
+}
+
+void ExtDisplay::SelectPauseItemDown(){
+  int nextItem = (int)selectedPauseItem+5;
+  if(nextItem>PauseItem_Save) nextItem = nextItem - PauseItem_Save;
+  if(nextItem>11 & nextItem<15){
+    nextItem += 5;
+    if(nextItem>PauseItem_Save) nextItem = nextItem - PauseItem_Save;
+  }
+	ExtDisplay::SelectPauseItem((ExtDisplay::PauseItem_e)(nextItem));
 }
 
 void ExtDisplay::SelectPauseItem(ExtDisplay::PauseItem_e pauseItem, bool force){

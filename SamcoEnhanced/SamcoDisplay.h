@@ -133,6 +133,9 @@ public:
 
 	void SelectPauseItemNext();
     void SelectPauseItemPrevious();
+    void SelectPauseItemUp();
+    void SelectPauseItemDown();
+        
 	void SelectPauseItem(ExtDisplay::PauseItem_e pauseItem, bool force=false);
     void UpdatePauseLabel();
 
